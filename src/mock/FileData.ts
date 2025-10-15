@@ -18,25 +18,25 @@ export const fileData: PatientFile[] = [
       // {
       //   date: '2025-07-29',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '喉运动信号_P001_张三_2025-07-29-14-12-31.csv', type: 'csv' },
+      //     { name: '呼吸信号_P001_张三_2025-07-29-14-13-05.csv', type: 'csv' },
+      //     { name: '吞咽声音信号_P001_张三_2025-07-29-14-13-55.wav', type: 'wav' },
+      //     { name: '吞咽报告_P001_张三_2025-07-29-14-14-40.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-27',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '喉运动信号_P001_张三_2025-07-27-09-20-11.csv', type: 'csv' },
+      //     { name: '呼吸信号_P001_张三_2025-07-27-09-21-30.csv', type: 'csv' },
+      //     { name: '吞咽报告_P001_张三_2025-07-27-09-22-45.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-25',
       //   files: [
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '吞咽声音信号_P001_张三_2025-07-25-08-10-05.wav', type: 'wav' },
+      //     { name: '吞咽报告_P001_张三_2025-07-25-08-12-42.pdf', type: 'pdf' },
       //   ],
       // },
     ],
@@ -48,29 +48,46 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-28',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P002_李四_2025-07-28-14-30-43.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P002_李四_2025-07-28-14-32-17.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P002_李四_2025-07-28-14-33-55.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-26',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P002_李四_2025-07-26-10-11-05.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P002_李四_2025-07-26-10-12-30.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-24',
-        files: [{ name: 'report.pdf', type: 'pdf' }],
+        files: [
+          { name: '吞咽报告_P002_李四_2025-07-24-11-05-11.pdf', type: 'pdf' },
+        ],
       },
       {
         date: '2025-07-23',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P002_李四_2025-07-23-08-01-22.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P002_李四_2025-07-23-08-03-40.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P002_李四_2025-07-23-08-04-51.csv', type: 'csv' },
+          { name: '吞咽报告_P002_李四_2025-07-23-08-06-33.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -82,24 +99,36 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-28',
         files: [
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
+          { name: '呼吸信号_P003_王五_2025-07-28-09-10-15.csv', type: 'csv' },
+          {
+            name: '吞咽声音信号_P003_王五_2025-07-28-09-12-48.wav',
+            type: 'wav',
+          },
         ],
       },
       {
         date: '2025-07-26',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P003_王五_2025-07-26-10-20-33.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P003_王五_2025-07-26-10-22-59.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-23',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P003_王五_2025-07-23-08-01-45.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P003_王五_2025-07-23-08-03-12.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P003_王五_2025-07-23-08-04-37.csv', type: 'csv' },
+          { name: '吞咽报告_P003_王五_2025-07-23-08-06-11.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -111,22 +140,31 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P004_赵六_2025-07-27-14-11-28.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P004_赵六_2025-07-27-14-13-09.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
+          { name: '呼吸信号_P004_赵六_2025-07-25-09-15-44.csv', type: 'csv' },
+          {
+            name: '吞咽声音信号_P004_赵六_2025-07-25-09-17-30.wav',
+            type: 'wav',
+          },
         ],
       },
       {
         date: '2025-07-22',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P004_赵六_2025-07-22-10-05-25.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P004_赵六_2025-07-22-10-07-58.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -138,21 +176,23 @@ export const fileData: PatientFile[] = [
       // {
       //   date: '2025-07-29',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '喉运动信号_P005_孙七_2025-07-29-08-10-22.csv', type: 'csv' },
+      //     { name: '呼吸信号_P005_孙七_2025-07-29-08-12-35.csv', type: 'csv' },
+      //     { name: '吞咽报告_P005_孙七_2025-07-29-08-14-59.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-28',
       //   files: [
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '吞咽声音信号_P005_孙七_2025-07-28-09-20-11.wav', type: 'wav' },
+      //     { name: '吞咽报告_P005_孙七_2025-07-28-09-22-33.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-26',
-      //   files: [{ name: 'imu.csv', type: 'csv' }],
+      //   files: [
+      //     { name: '喉运动信号_P005_孙七_2025-07-26-10-01-47.csv', type: 'csv' },
+      //   ],
       // },
     ],
   },
@@ -163,23 +203,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P006_周八_2025-07-27-14-15-11.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P006_周八_2025-07-27-14-17-46.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P006_周八_2025-07-25-09-25-37.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P006_周八_2025-07-25-09-27-22.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P006_周八_2025-07-21-08-30-13.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P006_周八_2025-07-21-08-32-49.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P006_周八_2025-07-21-08-35-02.csv', type: 'csv' },
         ],
       },
     ],
@@ -191,23 +243,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P007_曹操_2025-07-27-15-11-45.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P007_曹操_2025-07-27-15-13-59.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P007_曹操_2025-07-25-10-01-22.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P007_曹操_2025-07-25-10-03-48.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P007_曹操_2025-07-21-09-02-10.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P007_曹操_2025-07-21-09-04-17.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P007_曹操_2025-07-21-09-05-41.csv', type: 'csv' },
         ],
       },
     ],
@@ -219,23 +283,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P008_刘备_2025-07-27-11-25-32.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P008_刘备_2025-07-27-11-27-15.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P008_刘备_2025-07-25-08-45-12.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P008_刘备_2025-07-25-08-47-59.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P008_刘备_2025-07-21-07-35-28.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P008_刘备_2025-07-21-07-37-44.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P008_刘备_2025-07-21-07-39-03.csv', type: 'csv' },
         ],
       },
     ],
@@ -247,23 +323,23 @@ export const fileData: PatientFile[] = [
       // {
       //   date: '2025-07-27',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
+      //     { name: '喉运动信号_P009_朝武芳乃_2025-07-27-14-12-31.csv', type: 'csv' },
+      //     { name: '呼吸信号_P009_朝武芳乃_2025-07-27-14-13-55.csv', type: 'csv' },
       //   ],
       // },
       // {
       //   date: '2025-07-25',
       //   files: [
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '吞咽声音信号_P009_朝武芳乃_2025-07-25-10-16-20.wav', type: 'wav' },
+      //     { name: '吞咽报告_P009_朝武芳乃_2025-07-25-10-18-47.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-21',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'gas.csv', type: 'csv' },
+      //     { name: '喉运动信号_P009_朝武芳乃_2025-07-21-09-35-58.csv', type: 'csv' },
+      //     { name: '吞咽声音信号_P009_朝武芳乃_2025-07-21-09-37-29.wav', type: 'wav' },
+      //     { name: '呼吸信号_P009_朝武芳乃_2025-07-21-09-39-12.csv', type: 'csv' },
       //   ],
       // },
     ],
@@ -275,23 +351,23 @@ export const fileData: PatientFile[] = [
       // {
       //   date: '2025-07-27',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
+      //     { name: '喉运动信号_P010_常陆茉子_2025-07-27-13-20-45.csv', type: 'csv' },
+      //     { name: '呼吸信号_P010_常陆茉子_2025-07-27-13-22-58.csv', type: 'csv' },
       //   ],
       // },
       // {
       //   date: '2025-07-25',
       //   files: [
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '吞咽声音信号_P010_常陆茉子_2025-07-25-09-10-36.wav', type: 'wav' },
+      //     { name: '吞咽报告_P010_常陆茉子_2025-07-25-09-12-11.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-21',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'gas.csv', type: 'csv' },
+      //     { name: '喉运动信号_P010_常陆茉子_2025-07-21-07-30-28.csv', type: 'csv' },
+      //     { name: '吞咽声音信号_P010_常陆茉子_2025-07-21-07-32-15.wav', type: 'wav' },
+      //     { name: '呼吸信号_P010_常陆茉子_2025-07-21-07-34-41.csv', type: 'csv' },
       //   ],
       // },
     ],
@@ -303,23 +379,23 @@ export const fileData: PatientFile[] = [
       // {
       //   date: '2025-07-27',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
+      //     { name: '喉运动信号_P011_绫地宁宁_2025-07-27-09-10-05.csv', type: 'csv' },
+      //     { name: '呼吸信号_P011_绫地宁宁_2025-07-27-09-12-19.csv', type: 'csv' },
       //   ],
       // },
       // {
       //   date: '2025-07-25',
       //   files: [
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '吞咽声音信号_P011_绫地宁宁_2025-07-25-10-05-44.wav', type: 'wav' },
+      //     { name: '吞咽报告_P011_绫地宁宁_2025-07-25-10-07-01.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-21',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'gas.csv', type: 'csv' },
+      //     { name: '喉运动信号_P011_绫地宁宁_2025-07-21-08-00-33.csv', type: 'csv' },
+      //     { name: '吞咽声音信号_P011_绫地宁宁_2025-07-21-08-02-10.wav', type: 'wav' },
+      //     { name: '呼吸信号_P011_绫地宁宁_2025-07-21-08-03-42.csv', type: 'csv' },
       //   ],
       // },
     ],
@@ -331,23 +407,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P012_李华_2025-07-27-11-15-20.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P012_李华_2025-07-27-11-17-02.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P012_李华_2025-07-25-09-41-26.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P012_李华_2025-07-25-09-43-10.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P012_李华_2025-07-21-08-05-33.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P012_李华_2025-07-21-08-07-18.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P012_李华_2025-07-21-08-09-04.csv', type: 'csv' },
         ],
       },
     ],
@@ -359,25 +447,25 @@ export const fileData: PatientFile[] = [
       // {
       //   date: '2025-07-29',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '喉运动信号_P013_张三_2025-07-29-13-21-05.csv', type: 'csv' },
+      //     { name: '呼吸信号_P013_张三_2025-07-29-13-22-41.csv', type: 'csv' },
+      //     { name: '吞咽声音信号_P013_张三_2025-07-29-13-24-12.wav', type: 'wav' },
+      //     { name: '吞咽报告_P013_张三_2025-07-29-13-25-55.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-27',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '喉运动信号_P013_张三_2025-07-27-10-10-03.csv', type: 'csv' },
+      //     { name: '呼吸信号_P013_张三_2025-07-27-10-11-44.csv', type: 'csv' },
+      //     { name: '吞咽报告_P013_张三_2025-07-27-10-13-09.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-25',
       //   files: [
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '吞咽声音信号_P013_张三_2025-07-25-09-05-27.wav', type: 'wav' },
+      //     { name: '吞咽报告_P013_张三_2025-07-25-09-06-58.pdf', type: 'pdf' },
       //   ],
       // },
     ],
@@ -389,29 +477,46 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-28',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P014_李四_2025-07-28-14-01-12.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P014_李四_2025-07-28-14-03-05.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P014_李四_2025-07-28-14-04-47.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-26',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P014_李四_2025-07-26-09-20-31.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P014_李四_2025-07-26-09-22-08.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-24',
-        files: [{ name: 'report.pdf', type: 'pdf' }],
+        files: [
+          { name: '吞咽报告_P014_李四_2025-07-24-08-55-40.pdf', type: 'pdf' },
+        ],
       },
       {
         date: '2025-07-23',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P014_李四_2025-07-23-10-11-42.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P014_李四_2025-07-23-10-13-09.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P014_李四_2025-07-23-10-14-26.csv', type: 'csv' },
+          { name: '吞咽报告_P014_李四_2025-07-23-10-16-03.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -423,24 +528,36 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-28',
         files: [
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
+          { name: '呼吸信号_P015_王五_2025-07-28-08-30-11.csv', type: 'csv' },
+          {
+            name: '吞咽声音信号_P015_王五_2025-07-28-08-31-59.wav',
+            type: 'wav',
+          },
         ],
       },
       {
         date: '2025-07-26',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P015_王五_2025-07-26-11-05-33.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P015_王五_2025-07-26-11-07-10.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-23',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P015_王五_2025-07-23-09-00-20.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P015_王五_2025-07-23-09-02-41.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P015_王五_2025-07-23-09-04-03.csv', type: 'csv' },
+          { name: '吞咽报告_P015_王五_2025-07-23-09-05-55.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -452,22 +569,31 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P016_赵六_2025-07-27-13-12-44.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P016_赵六_2025-07-27-13-14-21.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
+          { name: '呼吸信号_P016_赵六_2025-07-25-10-20-36.csv', type: 'csv' },
+          {
+            name: '吞咽声音信号_P016_赵六_2025-07-25-10-22-18.wav',
+            type: 'wav',
+          },
         ],
       },
       {
         date: '2025-07-22',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P016_赵六_2025-07-22-08-10-02.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P016_赵六_2025-07-22-08-12-47.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -479,21 +605,32 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-29',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P017_孙七_2025-07-29-09-25-11.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P017_孙七_2025-07-29-09-27-30.csv', type: 'csv' },
+          { name: '吞咽报告_P017_孙七_2025-07-29-09-29-42.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-28',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P017_孙七_2025-07-28-10-15-05.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P017_孙七_2025-07-28-10-16-57.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-26',
-        files: [{ name: 'imu.csv', type: 'csv' }],
+        files: [
+          {
+            name: '喉运动信号_P017_孙七_2025-07-26-08-40-20.csv',
+            type: 'csv',
+          },
+        ],
       },
     ],
   },
@@ -504,23 +641,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P018_周八_2025-07-27-14-41-03.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P018_周八_2025-07-27-14-42-37.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P018_周八_2025-07-25-09-55-28.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P018_周八_2025-07-25-09-57-12.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P018_周八_2025-07-21-07-20-14.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P018_周八_2025-07-21-07-22-03.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P018_周八_2025-07-21-07-23-26.csv', type: 'csv' },
         ],
       },
     ],
@@ -532,23 +681,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P019_曹操_2025-07-27-10-31-40.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P019_曹操_2025-07-27-10-33-05.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P019_曹操_2025-07-25-08-50-22.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P019_曹操_2025-07-25-08-52-11.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P019_曹操_2025-07-21-09-11-33.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P019_曹操_2025-07-21-09-13-07.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P019_曹操_2025-07-21-09-14-36.csv', type: 'csv' },
         ],
       },
     ],
@@ -560,23 +721,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P020_刘备_2025-07-27-12-05-18.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P020_刘备_2025-07-27-12-06-44.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P020_刘备_2025-07-25-09-31-05.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P020_刘备_2025-07-25-09-33-29.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P020_刘备_2025-07-21-08-25-00.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P020_刘备_2025-07-21-08-26-37.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P020_刘备_2025-07-21-08-28-12.csv', type: 'csv' },
         ],
       },
     ],
@@ -588,23 +761,44 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P021_朝武芳乃_2025-07-27-11-12-20.csv',
+            type: 'csv',
+          },
+          {
+            name: '呼吸信号_P021_朝武芳乃_2025-07-27-11-14-01.csv',
+            type: 'csv',
+          },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P021_朝武芳乃_2025-07-25-09-20-45.wav',
+            type: 'wav',
+          },
+          {
+            name: '吞咽报告_P021_朝武芳乃_2025-07-25-09-22-33.pdf',
+            type: 'pdf',
+          },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P021_朝武芳乃_2025-07-21-08-10-25.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P021_朝武芳乃_2025-07-21-08-12-02.wav',
+            type: 'wav',
+          },
+          {
+            name: '呼吸信号_P021_朝武芳乃_2025-07-21-08-13-47.csv',
+            type: 'csv',
+          },
         ],
       },
     ],
@@ -616,23 +810,44 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P022_常陆茉子_2025-07-27-10-30-42.csv',
+            type: 'csv',
+          },
+          {
+            name: '呼吸信号_P022_常陆茉子_2025-07-27-10-32-19.csv',
+            type: 'csv',
+          },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P022_常陆茉子_2025-07-25-09-05-36.wav',
+            type: 'wav',
+          },
+          {
+            name: '吞咽报告_P022_常陆茉子_2025-07-25-09-07-11.pdf',
+            type: 'pdf',
+          },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P022_常陆茉子_2025-07-21-08-50-05.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P022_常陆茉子_2025-07-21-08-52-26.wav',
+            type: 'wav',
+          },
+          {
+            name: '呼吸信号_P022_常陆茉子_2025-07-21-08-54-47.csv',
+            type: 'csv',
+          },
         ],
       },
     ],
@@ -644,23 +859,44 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P023_绫地宁宁_2025-07-27-14-05-21.csv',
+            type: 'csv',
+          },
+          {
+            name: '呼吸信号_P023_绫地宁宁_2025-07-27-14-07-10.csv',
+            type: 'csv',
+          },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P023_绫地宁宁_2025-07-25-10-35-11.wav',
+            type: 'wav',
+          },
+          {
+            name: '吞咽报告_P023_绫地宁宁_2025-07-25-10-37-00.pdf',
+            type: 'pdf',
+          },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P023_绫地宁宁_2025-07-21-09-40-20.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P023_绫地宁宁_2025-07-21-09-42-09.wav',
+            type: 'wav',
+          },
+          {
+            name: '呼吸信号_P023_绫地宁宁_2025-07-21-09-44-03.csv',
+            type: 'csv',
+          },
         ],
       },
     ],
@@ -672,23 +908,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P024_李华_2025-07-27-11-50-16.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P024_李华_2025-07-27-11-52-01.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P024_李华_2025-07-25-09-45-22.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P024_李华_2025-07-25-09-47-19.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P024_李华_2025-07-21-08-20-25.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P024_李华_2025-07-21-08-22-04.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P024_李华_2025-07-21-08-23-45.csv', type: 'csv' },
         ],
       },
     ],
@@ -700,25 +948,25 @@ export const fileData: PatientFile[] = [
       // {
       //   date: '2025-07-29',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '喉运动信号_P025_张三_2025-07-29-10-05-14.csv', type: 'csv' },
+      //     { name: '呼吸信号_P025_张三_2025-07-29-10-07-00.csv', type: 'csv' },
+      //     { name: '吞咽声音信号_P025_张三_2025-07-29-10-08-36.wav', type: 'wav' },
+      //     { name: '吞咽报告_P025_张三_2025-07-29-10-10-12.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-27',
       //   files: [
-      //     { name: 'imu.csv', type: 'csv' },
-      //     { name: 'gas.csv', type: 'csv' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '喉运动信号_P025_张三_2025-07-27-09-12-28.csv', type: 'csv' },
+      //     { name: '呼吸信号_P025_张三_2025-07-27-09-14-03.csv', type: 'csv' },
+      //     { name: '吞咽报告_P025_张三_2025-07-27-09-15-47.pdf', type: 'pdf' },
       //   ],
       // },
       // {
       //   date: '2025-07-25',
       //   files: [
-      //     { name: 'audio.wav', type: 'wav' },
-      //     { name: 'report.pdf', type: 'pdf' },
+      //     { name: '吞咽声音信号_P025_张三_2025-07-25-08-55-18.wav', type: 'wav' },
+      //     { name: '吞咽报告_P025_张三_2025-07-25-08-57-04.pdf', type: 'pdf' },
       //   ],
       // },
     ],
@@ -730,29 +978,46 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-28',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P026_李四_2025-07-28-14-21-41.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P026_李四_2025-07-28-14-23-19.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P026_李四_2025-07-28-14-25-00.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-26',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P026_李四_2025-07-26-09-55-12.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P026_李四_2025-07-26-09-56-47.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-24',
-        files: [{ name: 'report.pdf', type: 'pdf' }],
+        files: [
+          { name: '吞咽报告_P026_李四_2025-07-24-10-30-15.pdf', type: 'pdf' },
+        ],
       },
       {
         date: '2025-07-23',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P026_李四_2025-07-23-11-01-32.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P026_李四_2025-07-23-11-03-05.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P026_李四_2025-07-23-11-04-44.csv', type: 'csv' },
+          { name: '吞咽报告_P026_李四_2025-07-23-11-06-20.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -764,24 +1029,36 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-28',
         files: [
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
+          { name: '呼吸信号_P027_王五_2025-07-28-08-15-20.csv', type: 'csv' },
+          {
+            name: '吞咽声音信号_P027_王五_2025-07-28-08-16-55.wav',
+            type: 'wav',
+          },
         ],
       },
       {
         date: '2025-07-26',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P027_王五_2025-07-26-09-40-13.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P027_王五_2025-07-26-09-41-59.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-23',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P027_王五_2025-07-23-10-21-28.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P027_王五_2025-07-23-10-23-05.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P027_王五_2025-07-23-10-24-44.csv', type: 'csv' },
+          { name: '吞咽报告_P027_王五_2025-07-23-10-26-17.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -793,22 +1070,31 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P028_赵六_2025-07-27-14-11-25.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P028_赵六_2025-07-27-14-13-10.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
+          { name: '呼吸信号_P028_赵六_2025-07-25-09-51-44.csv', type: 'csv' },
+          {
+            name: '吞咽声音信号_P028_赵六_2025-07-25-09-53-27.wav',
+            type: 'wav',
+          },
         ],
       },
       {
         date: '2025-07-22',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P028_赵六_2025-07-22-08-15-02.csv',
+            type: 'csv',
+          },
+          { name: '吞咽报告_P028_赵六_2025-07-22-08-16-44.pdf', type: 'pdf' },
         ],
       },
     ],
@@ -820,21 +1106,32 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-29',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '喉运动信号_P029_孙七_2025-07-29-09-01-30.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P029_孙七_2025-07-29-09-03-12.csv', type: 'csv' },
+          { name: '吞咽报告_P029_孙七_2025-07-29-09-05-05.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-28',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P029_孙七_2025-07-28-10-12-45.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P029_孙七_2025-07-28-10-14-31.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-26',
-        files: [{ name: 'imu.csv', type: 'csv' }],
+        files: [
+          {
+            name: '喉运动信号_P029_孙七_2025-07-26-08-40-22.csv',
+            type: 'csv',
+          },
+        ],
       },
     ],
   },
@@ -845,23 +1142,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P030_周八_2025-07-27-13-25-37.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P030_周八_2025-07-27-13-27-20.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P030_周八_2025-07-25-09-35-12.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P030_周八_2025-07-25-09-37-01.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P030_周八_2025-07-21-08-50-44.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P030_周八_2025-07-21-08-52-15.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P030_周八_2025-07-21-08-53-49.csv', type: 'csv' },
         ],
       },
     ],
@@ -873,23 +1182,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P031_曹操_2025-07-27-11-10-21.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P031_曹操_2025-07-27-11-12-04.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P031_曹操_2025-07-25-09-20-15.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P031_曹操_2025-07-25-09-22-03.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P031_曹操_2025-07-21-08-05-42.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P031_曹操_2025-07-21-08-07-29.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P031_曹操_2025-07-21-08-09-13.csv', type: 'csv' },
         ],
       },
     ],
@@ -901,23 +1222,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P032_刘备_2025-07-27-13-22-15.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P032_刘备_2025-07-27-13-23-59.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P032_刘备_2025-07-25-09-55-12.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P032_刘备_2025-07-25-09-56-44.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P032_刘备_2025-07-21-08-31-21.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P032_刘备_2025-07-21-08-32-59.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P032_刘备_2025-07-21-08-34-37.csv', type: 'csv' },
         ],
       },
     ],
@@ -929,23 +1262,44 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P033_朝武芳乃_2025-07-27-12-15-31.csv',
+            type: 'csv',
+          },
+          {
+            name: '呼吸信号_P033_朝武芳乃_2025-07-27-12-17-14.csv',
+            type: 'csv',
+          },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P033_朝武芳乃_2025-07-25-09-11-08.wav',
+            type: 'wav',
+          },
+          {
+            name: '吞咽报告_P033_朝武芳乃_2025-07-25-09-13-00.pdf',
+            type: 'pdf',
+          },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P033_朝武芳乃_2025-07-21-08-45-22.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P033_朝武芳乃_2025-07-21-08-47-11.wav',
+            type: 'wav',
+          },
+          {
+            name: '呼吸信号_P033_朝武芳乃_2025-07-21-08-49-05.csv',
+            type: 'csv',
+          },
         ],
       },
     ],
@@ -957,23 +1311,44 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P034_常陆茉子_2025-07-27-10-55-47.csv',
+            type: 'csv',
+          },
+          {
+            name: '呼吸信号_P034_常陆茉子_2025-07-27-10-57-30.csv',
+            type: 'csv',
+          },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P034_常陆茉子_2025-07-25-09-41-06.wav',
+            type: 'wav',
+          },
+          {
+            name: '吞咽报告_P034_常陆茉子_2025-07-25-09-42-55.pdf',
+            type: 'pdf',
+          },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P034_常陆茉子_2025-07-21-08-21-38.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P034_常陆茉子_2025-07-21-08-23-10.wav',
+            type: 'wav',
+          },
+          {
+            name: '呼吸信号_P034_常陆茉子_2025-07-21-08-24-51.csv',
+            type: 'csv',
+          },
         ],
       },
     ],
@@ -985,23 +1360,44 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P035_绫地宁宁_2025-07-27-14-41-19.csv',
+            type: 'csv',
+          },
+          {
+            name: '呼吸信号_P035_绫地宁宁_2025-07-27-14-43-02.csv',
+            type: 'csv',
+          },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P035_绫地宁宁_2025-07-25-10-22-15.wav',
+            type: 'wav',
+          },
+          {
+            name: '吞咽报告_P035_绫地宁宁_2025-07-25-10-24-00.pdf',
+            type: 'pdf',
+          },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P035_绫地宁宁_2025-07-21-09-10-25.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P035_绫地宁宁_2025-07-21-09-12-12.wav',
+            type: 'wav',
+          },
+          {
+            name: '呼吸信号_P035_绫地宁宁_2025-07-21-09-13-59.csv',
+            type: 'csv',
+          },
         ],
       },
     ],
@@ -1013,23 +1409,35 @@ export const fileData: PatientFile[] = [
       {
         date: '2025-07-27',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P036_李华_2025-07-27-12-20-34.csv',
+            type: 'csv',
+          },
+          { name: '呼吸信号_P036_李华_2025-07-27-12-22-11.csv', type: 'csv' },
         ],
       },
       {
         date: '2025-07-25',
         files: [
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'report.pdf', type: 'pdf' },
+          {
+            name: '吞咽声音信号_P036_李华_2025-07-25-09-33-50.wav',
+            type: 'wav',
+          },
+          { name: '吞咽报告_P036_李华_2025-07-25-09-35-29.pdf', type: 'pdf' },
         ],
       },
       {
         date: '2025-07-21',
         files: [
-          { name: 'imu.csv', type: 'csv' },
-          { name: 'audio.wav', type: 'wav' },
-          { name: 'gas.csv', type: 'csv' },
+          {
+            name: '喉运动信号_P036_李华_2025-07-21-08-44-16.csv',
+            type: 'csv',
+          },
+          {
+            name: '吞咽声音信号_P036_李华_2025-07-21-08-46-03.wav',
+            type: 'wav',
+          },
+          { name: '呼吸信号_P036_李华_2025-07-21-08-47-41.csv', type: 'csv' },
         ],
       },
     ],

@@ -206,7 +206,14 @@
                         :key="i"
                         class="file-cell"
                       >
-                        <span class="file-name">{{ file.name }}</span>
+                        <el-tooltip
+                          :content="file.name"
+                          placement="top"
+                          effect="dark"
+                          :show-after="300"
+                        >
+                          <span class="file-name">{{ file.name }}</span>
+                        </el-tooltip>
                         <el-button
                           size="small"
                           text
@@ -599,11 +606,18 @@ function onExportSinglePatient(user: string) {
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   background-color: #fafafa;
+  min-width: 0;
 }
 
 .file-name {
   font-family: monospace;
   font-size: 13px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
 }
 
 .pagination-wrapper {

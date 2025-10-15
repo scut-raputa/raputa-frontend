@@ -36,15 +36,20 @@
                       class="dropdown-avatar"
                     />
                     <div class="user-details">
-                      <!-- <div class="user-name">{{ mockUser.name }}</div> -->
-                      <div class="user-dept">{{ mockUser.hospital }}</div>
-                      <div class="user-dept">{{ mockUser.department }}</div>
+                      <div class="user-dept">
+                        {{ displayOrDash(currentUser?.hospitalName) }}
+                      </div>
+                      <div class="user-dept">
+                        {{ displayOrDash(currentUser?.departmentName) }}
+                      </div>
                     </div>
                   </div>
                   <el-divider />
                   <div class="login-info">
-                    <div>上次登录时间：{{ mockUser.lastLoginTime }}</div>
-                    <div>上次登录地点：{{ mockUser.lastLoginLocation }}</div>
+                    <div>上次登录时间：{{ lastLoginAtDisplay }}</div>
+                    <div>
+                      上次登录 IP：{{ displayOrDash(currentUser?.lastLoginIp) }}
+                    </div>
                   </div>
                 </div>
               </el-card>
@@ -88,7 +93,11 @@
               <el-icon><Histogram /></el-icon>
               <template #title>数据统计</template>
             </el-menu-item>
-            <el-menu-item index="/dashboard/system">
+            <el-menu-item v-if="!isAdmin" index="/dashboard/department">
+              <el-icon><Setting /></el-icon>
+              <template #title>科室管理</template>
+            </el-menu-item>
+            <el-menu-item v-else index="/dashboard/system">
               <el-icon><Setting /></el-icon>
               <template #title>系统管理</template>
             </el-menu-item>
@@ -115,9 +124,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { mockUser } from '@/mock/UserData'
+import { getUser, clearToken, clearUser } from '@/utils/auth'
+import type { UserVO } from '@/types/response'
 import {
   Fold,
   Expand,
@@ -134,10 +144,16 @@ import { ElMessage } from 'element-plus'
 const router = useRouter()
 const route = useRoute()
 
-const avatarUrl = ref<string>(mockUser.avatar)
+const currentUser = ref<UserVO | null>(getUser())
+const avatarUrl = ref<string>(resolveResourceUrl(currentUser.value?.avatarUrl))
+const lastLoginAtDisplay = computed(() =>
+  formatDateTime(currentUser.value?.lastLoginAt),
+)
 const isCollapsed = ref(false)
 const activeMenu = ref(route.path)
 const scrollAreaRef = ref<HTMLElement | null>(null)
+
+const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 
 watch(
   () => route.path,
@@ -153,6 +169,8 @@ onMounted(() => {
 function logout() {
   ElMessage.success({ message: '已登出，正在跳转到登录页', duration: 1500 })
   setTimeout(() => {
+    clearToken()
+    clearUser()
     router.push('/login')
   }, 1500)
 }
@@ -168,6 +186,24 @@ function onMenuSelect(index: string) {
   } else if (index !== route.path) {
     router.push(index)
   }
+}
+
+function resolveResourceUrl(path?: string) {
+  const BASE = 'http://localhost:8080'
+  if (!path || path.trim() === '') return `${BASE}/images/default-avatar.png`
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  return `${BASE}${path.startsWith('/') ? '' : '/'}${path}`
+}
+
+function formatDateTime(iso?: string | null) {
+  if (!iso) return '—'
+  return iso.slice(0, 19).replace('T', ' ')
+}
+
+function displayOrDash(v?: unknown) {
+  if (v == null) return '—'
+  if (typeof v === 'string' && v.trim() === '') return '—'
+  return v as string
 }
 </script>
 
@@ -397,7 +433,8 @@ body {
 }
 .user-dept {
   font-size: 0.9rem;
-  color: #6b7280;
+  font-weight: 700;
+  color: #111827;
   line-height: 1.2;
   word-break: break-word;
 }

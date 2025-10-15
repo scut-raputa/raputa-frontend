@@ -1,14 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Login from '@/views/Login.vue'
-import Register from '@/views/Register.vue'
-import DashboardLayout from '@/components/DashboardLayout.vue'
+import { installRouterGuards } from './guards'
 
 const routes = [
-  { path: '/login', name: 'Login', component: Login },
-  { path: '/register', name: 'Register', component: Register },
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/Login.vue'),
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/Register.vue'),
+  },
   {
     path: '/dashboard',
-    component: DashboardLayout,
+    component: () => import('@/components/DashboardLayout.vue'),
     children: [
       {
         path: 'patient',
@@ -31,6 +37,11 @@ const routes = [
         component: () => import('@/views/Data.vue'),
       },
       {
+        path: 'department',
+        name: 'DashboardDepartment',
+        component: () => import('@/views/Department.vue'),
+      },
+      {
         path: 'system',
         name: 'DashboardSystem',
         component: () => import('@/views/System.vue'),
@@ -50,5 +61,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
 })
+
+installRouterGuards(router)
 
 export default router

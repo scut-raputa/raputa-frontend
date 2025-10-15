@@ -13,4 +13,21 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+        configure(proxy) {
+          proxy.on('error', (err, req) => {
+            console.error('proxy error:', err?.message, 'for', req?.method, req?.url)
+          })
+          proxy.on('proxyReq', (proxyReq, req) => {
+            console.log('proxying:', req.method, req.url, '->', proxyReq.getHeader('host'))
+          })
+        },
+      },
+    },
+  },
 })
