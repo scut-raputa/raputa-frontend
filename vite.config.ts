@@ -34,7 +34,7 @@ export default defineConfig({
       },
       // WebSocket 代理 - 用于实时数据推送
       '/ws': {
-        target: 'http://localhost:8081',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         ws: true, // 启用 WebSocket 代理
         secure: false,

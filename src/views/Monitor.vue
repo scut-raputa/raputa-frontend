@@ -71,7 +71,7 @@
       </template>
 
       <div class="setting-row">
-        <el-input
+        <!-- <el-input
           v-model="patientName"
           placeholder="请输入患者姓名"
           clearable
@@ -81,7 +81,20 @@
           <template #prefix>
             <el-icon><User /></el-icon>
           </template>
-        </el-input>
+        </el-input> -->
+        <el-select-v2
+          v-model="selectedPatientId"
+          :options="patientOptions"
+          size="small"
+          filterable
+          clearable
+          placeholder="请选择患者"
+          style="width: 360px"
+        >
+          <template #prefix>
+            <el-icon><User /></el-icon>
+          </template>
+        </el-select-v2>
 
         <el-select
           v-model="selectedSegModel"
@@ -131,6 +144,7 @@
         <!-- 设备仅用于实时模式；文件模式不必选，仍保留控件以便切换 -->
         <el-select-v2
           v-model="selectedDevice"
+          multiple
           class="setting-item device-select"
           size="small"
           :loading="loading"
@@ -140,7 +154,6 @@
           :disabled="isFileMode"
           :filter-method="filterDevices"
           placeholder="请选择检测设备（实时模式）"
-
           clearable
           teleported
           popper-class="device-select-popper"
@@ -570,6 +583,40 @@ import { quickDeviceDiscovery, connectRealtimeDevice, disconnectRealtimeDevice }
 import { uploadAndPredict, type DetectionResponse } from '@/api/detect'
 import SockJS from 'sockjs-client'
 import { Client, type Frame } from '@stomp/stompjs'
+import axios from 'axios'
+
+const fakePatients = [
+  { id: 'P0001', name: '张三' },
+  { id: 'P0002', name: '李四' },
+  { id: 'P0003', name: '王五' },
+]
+
+// 患者下拉选项
+const patientOptions = fakePatients.map(p => ({
+  value: p.id,
+  label: `${p.id} - ${p.name}`,
+  id: p.id,
+  name: p.name
+}))
+
+const selectedPatientId = ref<string>('')
+
+const selectedPatientName = computed(() => {
+  const opt = patientOptions.find(o => o.value === selectedPatientId.value)
+  return opt?.name ?? ''
+})
+
+// === 从“已选设备ID列表”中取“第一个设备”的完整对象（若未选则为 null）
+const firstSelectedDevice = computed(() => {
+  const firstId = selectedDevice.value?.[0]
+  if (!firstId) return null
+  return deviceList.value.find(d => d.id === firstId) || null
+})
+
+// === 动态派生当前设备三要素（用于发后端，不需要额外状态）
+const currentDeviceId = computed(() => firstSelectedDevice.value?.id ?? '')
+const pickedDeviceIp  = computed(() => firstSelectedDevice.value?.ip ?? '')
+const currentDeviceName = computed(() => firstSelectedDevice.value?.id ?? '')
 
 const durationShort = 5
 const durationLong = 10
@@ -618,7 +665,6 @@ let audioDataBuffer: Float32Array = new Float32Array()
 const audioUrl = new URL('@/mock/signals/audio.wav', import.meta.url).href
 
 // 控制变量
-const patientName = ref('')
 const selectedSegModel = ref('segA')  // 默认选择第一个分割模型
 const selectedDetModel = ref('detC')  // 默认选择第一个检测模型
 const selectedTask = ref('both')     // 默认选择第一个任务
@@ -965,20 +1011,20 @@ function downloadReport() {
 
 //==================== 核心可用性：开始按钮条件 ====================
 const canStart = computed(() => {
+  const hasPatient = !!selectedPatientId.value
   if (isFileMode.value) {
-    // 文件模式下：只需患者姓名、模型选择 + CSV 已上传并映射就绪
     return !!(
-      patientName.value &&
+      hasPatient &&
       selectedSegModel.value &&
       selectedDetModel.value &&
       filePayloadReady.value &&
       !isDetecting.value
     )
   }
-  // 实时模式：沿用原逻辑（任务必填 + 至少 1 个设备）
+  // 实时模式：患者+模型+任务+至少一个设备
   return !!(
     !isFileMode.value &&
-    patientName.value &&
+    hasPatient &&
     selectedSegModel.value &&
     selectedDetModel.value &&
     selectedTask.value &&
@@ -1035,10 +1081,10 @@ function capSeries(series: [number, number][], maxLen: number) {
 }
 
 function resetUiInputs() {
-  patientName.value = ''
-  selectedSegModel.value = 'segA'  // 重置为默认值
-  selectedDetModel.value = 'detC'  // 重置为默认值
-  selectedTask.value = 'both'     // 重置为默认值
+  selectedPatientId.value = ''
+  selectedSegModel.value = 'segA'
+  selectedDetModel.value = 'detC'
+  selectedTask.value = 'both'
   selectedDevice.value = []
 }
 
@@ -1241,25 +1287,26 @@ async function startDetection() {
   canReset.value = false
   isInitial.value = false
 
+  // === 计算主设备（取已选列表的第一个）+ IP（从 deviceList 里找）
+  const primaryId = selectedDevice.value?.[0] || ''
+  const primaryIp = deviceList.value.find(d => d.id === primaryId)?.ip || ''
+
+  if (!primaryId || !primaryIp) {            // ✅ 新增兜底
+    ElMessage.error('请先选择在线设备（deviceId/deviceIp 不能为空）')
+    return
+  }
+
   if (isFileMode.value) {
+
+    // 原逻辑：启动文件模式检测
     startFileModeDetection()
     return
   }
 
-  // 实时模式 - 连接设备并启动WebSocket
+  // === 实时模式 ===
   try {
     if (selectedDevice.value.length === 0) {
       ElMessage.error('请先选择设备')
-      return
-    }
-    console.log(selectedDevice.value);
-
-
-    // 获取第一个选中的设备
-    const firstDeviceId = selectedDevice.value
-    const device = deviceList.value.find((d) => d.id === firstDeviceId)
-    if (!device) {
-      ElMessage.error('设备不存在')
       return
     }
 
@@ -1274,13 +1321,19 @@ async function startDetection() {
     // 重置基准时间戳
     realtimeBaseTimestamp = 0
 
-    // 1. 连接设备
-    await connectRealtimeDevice(device.ip, firstDeviceId)
+    // 连接设备（注意：这里 primaryId 必须是字符串）
+    await connectRealtimeDevice(
+      primaryIp,                            // 设备IP
+      primaryId,                            // 设备ID
+      primaryId,
+      selectedPatientId.value,              // 患者编号
+      selectedPatientName.value             // 患者姓名
+    )
 
-    // 2. 建立WebSocket连接
-    await connectWebSocket(firstDeviceId)
+    // 建立 WebSocket
+    await connectWebSocket(primaryId)
 
-    // 3. 启动实时渲染
+    // 启动渲染
     isDetecting.value = true
     startTime = performance.now()
     lastRender = 0
@@ -1294,8 +1347,12 @@ async function startDetection() {
 }
 
 async function stopDetection() {
+  // === 计算主设备（取已选列表的第一个）+ IP（从 deviceList 里找）
+  const primaryId = selectedDevice.value?.[0] || ''
+  const primaryIp = deviceList.value.find(d => d.id === primaryId)?.ip || ''
+
   if (isFileMode.value) {
-    // 文件模式：停止"结果播放"
+    // 文件模式：停止“结果播放”
     isDetecting.value = false
     if (swallowPlayTimer != null) {
       clearInterval(swallowPlayTimer)
@@ -1310,7 +1367,7 @@ async function stopDetection() {
     return
   }
 
-  // 实时模式 - 断开WebSocket和设备连接
+  // === 实时模式 ===
   isDetecting.value = false
   hasStopped.value = true
   canReset.value = true
@@ -1320,14 +1377,17 @@ async function stopDetection() {
     animationId = null
   }
 
-  // 断开WebSocket
+  // 断开 WebSocket
   disconnectWebSocket()
 
   // 断开设备连接
   if (selectedDevice.value.length > 0) {
     try {
-      let csvPath = await disconnectRealtimeDevice(selectedDevice.value)
-      ElMessage.success(`设备已断开连接,文件已保存至:${csvPath}`)
+      const primaryId = selectedDevice.value?.[0] || ''
+      if (primaryId) {
+        await disconnectRealtimeDevice(primaryId)
+      }
+      // ElMessage.success(`设备已断开连接,文件已保存至:${csvPath}`)
     } catch (error: any) {
       console.error('断开设备失败:', error)
     }
