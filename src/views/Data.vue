@@ -14,7 +14,7 @@
           :filter-method="handleFilterPatients"
           multiple
           collapse-tags
-          :max-collapse-tags="8"
+          :max-collapse-tags="5"
           size="small"
           :options="patientOptions"
           placeholder="请选择指定的患者"
@@ -180,7 +180,7 @@
                   type="primary"
                   size="small"
                   dark
-                  @click="() => onExportSinglePatient(patient.name)"
+                  @click="() => onExportSinglePatient(patient.name, patient.id)"
                 >
                   <el-icon style="margin-right: 4px"><Download /></el-icon>
                   批量导出
@@ -190,9 +190,9 @@
 
             <div class="card-files">
               <div class="file-section">
-                <template v-if="getFilteredFilesByDate(patient).length > 0">
+                <template v-if="getFilteredGroupsByDate(patient).length > 0">
                   <div
-                    v-for="(group, gIdx) in getFilteredFilesByDate(patient)"
+                    v-for="(group, gIdx) in getFilteredGroupsByDate(patient)"
                     :key="gIdx"
                     class="file-group"
                   >
@@ -200,28 +200,24 @@
                       <el-icon class="file-date-icon"><FolderOpened /></el-icon>
                       {{ group.date }}
                     </div>
-                    <div class="file-grid">
-                      <div
-                        v-for="(file, i) in group.files"
-                        :key="i"
-                        class="file-cell"
-                      >
-                        <el-tooltip
-                          :content="file.name"
-                          placement="top"
-                          effect="dark"
-                          :show-after="300"
-                        >
-                          <span class="file-name">{{ file.name }}</span>
-                        </el-tooltip>
-                        <el-button
-                          size="small"
-                          text
-                          type="primary"
-                          @click="() => onDownload(patient.name, file.name)"
-                        >
-                          下载
-                        </el-button>
+
+                    <!-- 日期下的多个时间段（精确到秒） -->
+                    <div v-for="(slot, sIdx) in group.slots" :key="sIdx" class="time-slot">
+                      <div class="time-slot-title">时间：{{ slot.time }}</div>
+                      <div class="file-grid">
+                        <div v-for="(file, i) in slot.files" :key="i" class="file-cell">
+                          <el-tooltip :content="file.name" placement="top" effect="dark" :show-after="300">
+                            <span class="file-name">{{ file.name }}</span>
+                          </el-tooltip>
+                          <el-button
+                            size="small"
+                            text
+                            type="primary"
+                            @click="() => onDownload(patient.name, file.name, file.path)"
+                          >
+                            下载
+                          </el-button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -256,7 +252,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, watchEffect, watch } from 'vue'
+import { ref, computed, reactive, watchEffect, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { CheckboxValueType } from 'element-plus'
 import {
@@ -267,8 +263,13 @@ import {
   Search,
   FolderOpened,
 } from '@element-plus/icons-vue'
-import { fileData } from '@/mock/FileData'
-import type { PatientFile } from '@/mock/FileData'
+import axios from 'axios'
+
+// ---- 后端返回的数据结构 ----
+type FileItem = { name: string; type: string; path: string }
+type TimeGroup = { time: string; files: FileItem[] }                // HH:mm:ss
+type DateGroup = { date: string; slots: TimeGroup[] }               // yyyy-MM-dd
+type PatientFiles = { id: string; name: string; dates: DateGroup[] }
 
 // 1. 搜索条件
 const searchId = ref('')
@@ -281,24 +282,59 @@ const fileTypes = ref<string[]>([])
 const page = ref(1)
 const pageSize = 3
 
-// 3. 所有患者选项（原始）
-const patientOptions = fileData.map((p) => ({
-  value: p.id,
-  label: `${p.name} (${p.id})`,
-}))
+// 所有患者选项（来自 /api/patient）
+const patientOptions = ref<{ value: string; label: string }[]>([])
 
-// 4. 已选患者 & 全选控制
+// 后端返回的 “所有患者 + 文件概览”（没记录的 dates=[]）
+const allData = ref<PatientFiles[]>([])
+
+// 已选患者 & 全选控制
 const selectedPatients = ref<string[]>([])
 const checkAllPatients = ref(false)
 const indeterminatePatients = ref(false)
+
+async function fetchPatients() {
+  const { data } = await axios.get('/api/patient', { params: { page: 1, size: 1000 } })
+  const items = data?.data?.items ?? []
+  patientOptions.value = items.map((x: any) => ({
+    value: String(x.id),
+    label: `${x.name} (${x.id})`,
+  }))
+}
+
+async function fetchOverview() {
+  const params: any = {}
+  if (searchDate.value) {
+    const d = searchDate.value
+    params.date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  }
+  if (selectedPatients.value.length) params.patientIds = selectedPatients.value.join(',')
+  if (fileTypes.value.length) params.types = fileTypes.value.join(',')
+  if (searchFile.value) params.filename = searchFile.value
+
+  const { data } = await axios.get('/api/patient-file/overview', { params })
+  allData.value = data?.data ?? []
+}
+
+onMounted(async () => {
+  await fetchPatients()
+  await fetchOverview()
+})
+
+watch([selectedPatients, searchDate, fileTypes, searchFile], () => {
+  fetchOverview().catch(() => {})
+})
 
 // 5. 当前 el-select 输入框的搜索关键词
 const currentQuery = ref('')
 
 // 6. 实时计算当前匹配的选项（用于判断“全选”状态）
-const matchedOptions = computed(() => {
+const matchedOptions = computed<{ value: string; label: string }[]>(() => {
   const lower = currentQuery.value.toLowerCase()
-  return patientOptions.filter((opt) => opt.label.toLowerCase().includes(lower))
+  const list = patientOptions.value ?? []
+  return list.filter((opt: { value: string; label: string }) =>
+    opt.label.toLowerCase().includes(lower)
+  )
 })
 
 // 7. 监听 selectedPatients + currentQuery 变化自动更新 check 状态
@@ -352,95 +388,58 @@ const patientFilters: Record<
 > = reactive({})
 
 watchEffect(() => {
-  for (const patient of fileData) {
+  for (const patient of allData.value) {
     if (!patientFilters[patient.id]) {
-      patientFilters[patient.id] = {
-        searchDate: null,
-        searchFile: '',
-        fileTypes: [],
-      }
+      patientFilters[patient.id] = { searchDate: null, searchFile: '', fileTypes: [] }
     }
   }
 })
 
 // 11. 卡片内部文件过滤逻辑
-function getFilteredFilesByDate(patient: PatientFile) {
+function getFilteredGroupsByDate(patient: PatientFiles) {
   const filter = patientFilters[patient.id]
   if (!filter) return []
 
   const { searchDate, searchFile, fileTypes } = filter
-  const result: { date: string; files: { name: string; type: string }[] }[] = []
+  const res: { date: string; slots: { time: string; files: FileItem[] }[] }[] = []
 
-  for (const folder of patient.dates) {
+  for (const group of patient.dates) {
     const matchDate =
       !searchDate ||
-      new Date(folder.date).toDateString() === searchDate.toDateString()
+      new Date(group.date).toDateString() === searchDate.toDateString()
     if (!matchDate) continue
 
-    const matchedFiles = folder.files.filter((file) => {
-      const matchName = !searchFile || file.name.includes(searchFile)
-      const matchType = fileTypes.length === 0 || fileTypes.includes(file.type)
-      return matchName && matchType
-    })
+    const slots = group.slots
+      .map(slot => {
+        const matchedFiles = slot.files.filter(file => {
+          const matchName = !searchFile || file.name.includes(searchFile)
+          const matchType = fileTypes.length === 0 || fileTypes.includes(file.type)
+          return matchName && matchType
+        })
+        return { time: slot.time, files: matchedFiles }
+      })
+      .filter(s => s.files.length > 0)
 
-    if (matchedFiles.length > 0) {
-      result.push({ date: folder.date, files: matchedFiles })
+    if (slots.length > 0) {
+      res.push({ date: group.date, slots })
     }
   }
 
-  return result
+  return res
 }
+
 
 // 12. 控制台过滤数据（基于 searchXXX 条件）
 const filteredData = computed(() => {
-  return fileData
+  return allData.value
     .filter((patient) => {
-      // ⭐ 关键修改：如果 selectedPatients 非空，只保留被选中的患者
-      if (
-        selectedPatients.value.length > 0 &&
-        !selectedPatients.value.includes(patient.id)
-      ) {
+      if (selectedPatients.value.length > 0 && !selectedPatients.value.includes(patient.id)) {
         return false
       }
+      if (searchId.value && !patient.id.includes(searchId.value)) return false
+      if (searchName.value && !patient.name.includes(searchName.value)) return false
       return true
     })
-    .map((patient) => {
-      const matchId = !searchId.value || patient.id.includes(searchId.value)
-      const matchName =
-        !searchName.value || patient.name.includes(searchName.value)
-      if (!matchId || !matchName) return null
-
-      const hasNoRecords = patient.dates.length === 0
-      const hasFilters =
-        searchDate.value || searchFile.value || fileTypes.value.length > 0
-      if (hasNoRecords) {
-        return hasFilters ? null : { ...patient, dates: [] }
-      }
-
-      const filteredDates = patient.dates
-        .map((d) => {
-          const matchDate =
-            !searchDate.value ||
-            new Date(d.date).toDateString() === searchDate.value.toDateString()
-
-          const matchedFiles = d.files.filter(
-            (f) =>
-              (!searchFile.value || f.name.includes(searchFile.value)) &&
-              (fileTypes.value.length === 0 ||
-                fileTypes.value.includes(f.type)),
-          )
-
-          return matchDate && matchedFiles.length > 0
-            ? { date: d.date, files: matchedFiles }
-            : null
-        })
-        .filter(Boolean)
-
-      return filteredDates.length > 0
-        ? { ...patient, dates: filteredDates }
-        : null
-    })
-    .filter(Boolean) as PatientFile[]
 })
 
 // 13. 分页数据
@@ -457,16 +456,77 @@ watchEffect(() => {
 })
 
 // 14. 下载与导出
-function onDownload(user: string, file: string) {
-  ElMessage.success(`模拟下载：${user} 的 ${file}`)
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
-function onExportAll() {
-  ElMessage.success('模拟导出：当前筛选结果中的所有文件')
+// 1) 单文件下载（用真实路径）
+// 调用处已经传入 patient.name, file.name，现在我们也有 file.path
+async function onDownload(user: string, fileName: string, filePath?: string) {
+  try {
+    // 如果调用时没有传 path（例如你的模板里还没改），可先不报错
+    const path = filePath ?? ''
+    const { data } = await axios.get('/api/download/file', {
+      params: { path },
+      responseType: 'blob',
+    })
+    saveBlob(data, fileName)
+  } catch (e: any) {
+    ElMessage.error('下载失败')
+  }
 }
 
-function onExportSinglePatient(user: string) {
-  ElMessage.success(`模拟导出：${user} 卡片内部筛选文件`)
+// 2) 单个患者 批量下载（打包 ZIP）
+// 读取患者卡片里的筛选条件：patientFilters[patient.id]
+async function onExportSinglePatient(user: string, patientId: string) {
+  try {
+    const f = patientFilters[patientId]
+    const payload: any = {
+      patientId,
+      types: f.fileTypes?.length ? f.fileTypes : undefined,
+      filenameLike: f.searchFile || undefined,
+    }
+    if (f.searchDate) {
+      const d = f.searchDate
+      payload.date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    }
+
+    const { data } = await axios.post('/api/download/patient-zip', payload, { responseType: 'blob' })
+    const zipName = `patient_${patientId}_${payload.date ?? 'all'}.zip`
+    saveBlob(data, zipName)
+    ElMessage.success(`已导出 ${user} 的打包文件`)
+  } catch (e: any) {
+    ElMessage.error('导出失败')
+  }
+}
+
+// 3) 全部 批量下载（控制台筛选为准）
+async function onExportAll() {
+  try {
+    const payload: any = {
+      patientIds: selectedPatients.value.length ? selectedPatients.value : undefined,
+      types: fileTypes.value.length ? fileTypes.value : undefined,
+      filenameLike: searchFile.value || undefined,
+    }
+    if (searchDate.value) {
+      const d = searchDate.value
+      payload.date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    }
+
+    const { data } = await axios.post('/api/download/all-zip', payload, { responseType: 'blob' })
+    const zipName = `export_${payload.date ?? 'all'}.zip`
+    saveBlob(data, zipName)
+    ElMessage.success('已导出打包文件')
+  } catch (e: any) {
+    ElMessage.error('导出失败')
+  }
 }
 </script>
 
@@ -677,4 +737,7 @@ function onExportSinglePatient(user: string) {
   margin-right: 6px;
   vertical-align: middle;
 }
+
+.time-slot { margin: 6px 0 10px 8px; }
+.time-slot-title { color: #666; font-size: 13px; margin: 4px 0; }
 </style>

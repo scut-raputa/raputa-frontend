@@ -85,10 +85,15 @@
         <el-select-v2
           v-model="selectedPatientId"
           :options="patientOptions"
+          :remote="true"
+          :loading="patientLoading"
+          :remote-method="remotePatientQuery"
           size="small"
           filterable
           clearable
           placeholder="请选择患者"
+          @visible-change="onPatientSelectVisible"
+          @clear="() => { patientOptions = []; fetchPatients('') }"
           style="width: 360px"
         >
           <template #prefix>
@@ -586,26 +591,81 @@ import SockJS from 'sockjs-client'
 import { Client, type Frame } from '@stomp/stompjs'
 import axios from 'axios'
 
-const fakePatients = [
-  { id: 'P0001', name: '张三' },
-  { id: 'P0002', name: '李四' },
-  { id: 'P0003', name: '王五' },
-]
+type PatientOption = { value: string; label: string; id: string; name: string }
 
-// 患者下拉选项
-const patientOptions = fakePatients.map((p) => ({
-  value: p.id,
-  label: `${p.id} - ${p.name}`,
-  id: p.id,
-  name: p.name,
-}))
-
+const patientLoading = ref(false)
+const patientOptions = ref<PatientOption[]>([])
 const selectedPatientId = ref<string>('')
 
 const selectedPatientName = computed(() => {
-  const opt = patientOptions.find((o) => o.value === selectedPatientId.value)
-  return opt?.name ?? ''
+  const hit = patientOptions.value.find(o => o.value === selectedPatientId.value)
+  return hit?.name ?? ''
 })
+
+// 合并并按 id 去重
+function mergeById(a: any[], b: any[]) {
+  const map = new Map<string, any>()
+  ;[...a, ...b].forEach(p => map.set(p.id, p))
+  return Array.from(map.values())
+}
+
+// —— 稳妥版：分别按 id 和 name 搜，合并结果 ——
+// keyword 为空时只拉最近一页（按 admit desc, id desc）
+async function fetchPatients(keyword = '') {
+  patientLoading.value = true
+  try {
+    const base = { page: 1, size: 100 }
+
+    // 空关键字：拉一页最近入院的
+    if (!keyword.trim()) {
+      const { data } = await axios.get('/api/patient', { params: base })
+      const items = data?.data?.items ?? []
+      patientOptions.value = items.map((p: any) => ({
+        value: p.id,
+        label: `${p.id} - ${p.name}`,
+        id: p.id,
+        name: p.name,
+      }))
+      return
+    }
+
+    // 非空：并行两次请求（按 id 和按 name）
+    const kw = keyword.trim()
+    const [byId, byName] = await Promise.all([
+      axios.get('/api/patient', { params: { ...base, id: kw } }),
+      axios.get('/api/patient', { params: { ...base, name: kw } }),
+    ])
+
+    const itemsId = byId?.data?.data?.items ?? []
+    const itemsName = byName?.data?.data?.items ?? []
+    const merged = mergeById(itemsId, itemsName)
+
+    patientOptions.value = merged.map((p: any) => ({
+      value: p.id,
+      label: `${p.id} - ${p.name}`,
+      id: p.id,
+      name: p.name,
+    }))
+  } catch (e: any) {
+    ElMessage.error(e?.message || '患者列表加载失败')
+    patientOptions.value = []
+  } finally {
+    patientLoading.value = false
+  }
+}
+
+// 远程搜索（带微小防抖）
+const remotePatientQuery = (q: string) => {
+  if ((remotePatientQuery as any)._t) clearTimeout((remotePatientQuery as any)._t)
+  ;(remotePatientQuery as any)._t = setTimeout(() => fetchPatients(q), 200)
+}
+
+// 首次展开下拉时拉一页
+function onPatientSelectVisible(visible: boolean) {
+  if (visible && patientOptions.value.length === 0) {
+    fetchPatients('')
+  }
+}
 
 // === 从“已选设备ID列表”中取“第一个设备”的完整对象（若未选则为 null）
 const firstSelectedDevice = computed(() => {

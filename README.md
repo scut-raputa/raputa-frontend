@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**RAPUTA** (Real-time AI Platform for Unobtrusive Triaging of Airway disorders) is a Vue.js–based frontend for intelligent, non-invasive screening of dysphagia and aspiration risk. It provides clinicians with interactive views to manage patients, monitor real-time physiological signals, run assisted analyses (real-time or file-based), and export structured reports. The frontend connects to backend services for data handling, model execution, and device communication.
+**RAPUTA** (Real-time AI Platform for Unobtrusive Triaging of Airway) is a Vue.js–based frontend for intelligent, non-invasive screening of dysphagia and aspiration risk. It provides clinicians with interactive views to manage patients, monitor real-time physiological signals, run assisted analyses (real-time or file-based), and export structured reports. The frontend connects to backend services for data handling, model execution, and device communication.
 
 ---
 
