@@ -5,7 +5,7 @@
       <el-card shadow="hover" class="stat-card">
         <div class="stat-body">
           <div class="stat-left">
-            <el-statistic :value="120">
+            <el-statistic :value="10">
               <template #title>
                 <div class="stat-title">
                   模型总数
@@ -19,7 +19,7 @@
                 </div>
               </template>
             </el-statistic>
-            <div class="stat-note primary">投入使用模型数: 80</div>
+            <div class="stat-note primary">投入使用模型数: 2</div>
           </div>
 
           <div class="stat-right">
@@ -31,7 +31,7 @@
               :width="120"
             >
               <template #default>
-                <span class="circle-number">80</span>
+                <span class="circle-number">2</span>
                 <span class="circle-label">已部署模型数</span>
               </template>
             </el-progress>
@@ -43,7 +43,7 @@
       <el-card shadow="hover" class="stat-card">
         <div class="stat-body">
           <div class="stat-left">
-            <el-statistic :value="10">
+            <el-statistic :value="2">
               <template #title>
                 <div class="stat-title">
                   本周新增
@@ -57,7 +57,7 @@
                 </div>
               </template>
             </el-statistic>
-            <div class="stat-note success">本周新增模型部署数: 6</div>
+            <div class="stat-note success">本周新增模型部署数: 2</div>
           </div>
 
           <div class="stat-right">
@@ -91,14 +91,14 @@
                 <el-icon :size="12" class="stat-icon"><Warning /></el-icon>
               </el-tooltip>
             </div>
-            <div class="stat-value">张三</div>
-            <div class="stat-note warning">上传模型总数: 30</div>
+            <div class="stat-value">张海文</div>
+            <div class="stat-note warning">上传模型总数: 5</div>
           </div>
 
           <div class="stat-right">
             <el-progress
               type="dashboard"
-              :percentage="25"
+              :percentage="50"
               :stroke-width="8"
               color="#e6a23c"
               :width="120"

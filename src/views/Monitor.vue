@@ -680,7 +680,7 @@ const pickedDeviceIp = computed(() => firstSelectedDevice.value?.ip ?? '')
 const currentDeviceName = computed(() => firstSelectedDevice.value?.id ?? '')
 
 const durationShort = 5
-const durationLong = 10
+const durationLong = 20 // 吞咽图表显示20秒窗口，避免预测延迟
 
 const modeGuard = ref(false)
 
@@ -711,8 +711,8 @@ let swallowChart: echarts.ECharts
 const imuSeries = { X: [], Y: [], Z: [] } as Record<string, [number, number][]>
 const gasSeries = ref<[number, number][]>([])
 const audioSeries = ref<[number, number][]>([])
-let swallowSeries: [number, number][] = [] // 实时模式使用
-let riskSeries: [number, number][] = []
+let dysphagiaRealtimeSeries: [number, number][] = [] // 实时模式：吞咽障碍概率
+let aspirationRealtimeSeries: [number, number][] = [] // 实时模式：误吸概率
 
 // 文件模式“检测结果”渐进播放用
 let dysphagiaDisplaySeries: [number, number][] = [] // 吞咽障碍概率
@@ -739,6 +739,15 @@ const isDetecting = ref(false)
 const hasStopped = ref(false)
 const canReset = ref(false)
 const hasChartStarted = ref(false)
+
+// 实时检测统计数据
+const realtimeStats = reactive({
+  totalSwallows: 0, // 总吞咽次数
+  dysphagiaSwallows: 0, // 吞咽障碍次数
+  aspirationSwallows: 0, // 误吸次数
+  normalSwallows: 0, // 正常吞咽次数
+  hasDysphagia: false, // 是否有吞咽障碍
+})
 
 const reportDialogVisible = ref(false)
 const reportRef = ref<HTMLElement | null>(null)
@@ -1028,6 +1037,59 @@ function getBeijingTimestamp(includeTime = true) {
 }
 
 function openReportDialog() {
+  // 更新报告数据
+  reportData.value.name = selectedPatientName.value
+  reportData.value.totalSwallows = realtimeStats.totalSwallows
+  reportData.value.normalSwallows = realtimeStats.normalSwallows
+  reportData.value.dysphagiaSwallows = realtimeStats.dysphagiaSwallows
+  reportData.value.aspirationSwallows = realtimeStats.aspirationSwallows
+  reportData.value.abnormalSwallows = Math.max(
+    realtimeStats.aspirationSwallows,
+    realtimeStats.dysphagiaSwallows
+  )
+
+  // 诊断结果
+  reportData.value.diagnosis = realtimeStats.hasDysphagia
+    ? '吞咽障碍患者'
+    : '健康人'
+
+  // 根据误吸次数确定风险等级
+  const aspirationCount = realtimeStats.aspirationSwallows
+  if (aspirationCount === 0) {
+    reportData.value.riskLevel = '低风险'
+  } else if (aspirationCount <= 2) {
+    reportData.value.riskLevel = '中风险'
+  } else {
+    reportData.value.riskLevel = '高风险'
+  }
+
+  // 根据风险等级生成建议措施
+  const suggestions: string[] = []
+
+  if (reportData.value.riskLevel === '高风险') {
+    suggestions.push(
+      '1. 建议立即进行进一步的吞咽功能评估',
+      '2. 考虑调整饮食质地，避免稀薄液体',
+      '3. 建议在专业人员指导下进行吞咽康复训练',
+      '4. 必要时考虑使用增稠剂或改变进食姿势'
+    )
+  } else if (reportData.value.riskLevel === '中风险') {
+    suggestions.push(
+      '1. 建议进行吞咽功能评估',
+      '2. 注意进食时的姿势和速度',
+      '3. 可考虑进行吞咽康复训练',
+      '4. 定期复查监测吞咽功能变化'
+    )
+  } else {
+    suggestions.push(
+      '1. 继续保持良好的进食习惯',
+      '2. 注意进食时避免分心',
+      '3. 如有不适及时就医',
+      '4. 建议定期进行吞咽功能筛查'
+    )
+  }
+
+  reportData.value.suggestions = suggestions
   reportDialogVisible.value = true
 }
 
@@ -1267,8 +1329,8 @@ function resetChartAndData() {
   gasSeries.value.length = 0
   audioSeries.value.length = 0
 
-  swallowSeries.length = 0
-  riskSeries.length = 0
+  dysphagiaRealtimeSeries.length = 0
+  aspirationRealtimeSeries.length = 0
   dysphagiaDisplaySeries = []
   aspirationDisplaySeries = []
   swallowPlaybackRows = []
@@ -1285,6 +1347,13 @@ function resetChartAndData() {
   canReset.value = false
   isInitial.value = true
   reportDialogVisible.value = false
+
+  // 重置实时统计数据
+  realtimeStats.totalSwallows = 0
+  realtimeStats.dysphagiaSwallows = 0
+  realtimeStats.aspirationSwallows = 0
+  realtimeStats.normalSwallows = 0
+  realtimeStats.hasDysphagia = false
 
   renderEmptyCharts()
 }
@@ -1357,6 +1426,11 @@ async function startDetection() {
   canReset.value = false
   isInitial.value = false
 
+  if (isFileMode.value) {
+    startFileModeDetection()
+    return
+  }
+
   // === 计算主设备（取已选列表的第一个）+ IP（从 deviceList 里找）
   const primaryId = selectedDevice.value?.[0] || ''
   const primaryIp = deviceList.value.find((d) => d.id === primaryId)?.ip || ''
@@ -1364,11 +1438,6 @@ async function startDetection() {
   if (!primaryId || !primaryIp) {
     // ✅ 新增兜底
     ElMessage.error('请先选择在线设备（deviceId/deviceIp 不能为空）')
-    return
-  }
-
-  if (isFileMode.value) {
-    startFileModeDetection()
     return
   }
 
@@ -1593,12 +1662,27 @@ function createSingleOption(
     呼吸信号: '#58c1fa',
     吞咽声音信号: '#73C0DE',
   }
+  
+  // 呼吸信号使用以0为中心的Y轴
+  const yAxisConfig = title === '呼吸信号' 
+    ? { 
+        type: 'value' as const, 
+        min: -50, 
+        max: 50,
+        axisLine: {
+          show: true,
+          onZero: true,
+          lineStyle: { color: '#999' }
+        }
+      }
+    : { type: 'value' as const }
+  
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
     legend: { data: [title], top: 8, itemGap: 4 },
     grid: { top: 40, bottom: 24, left: 40, right: 20 },
     xAxis: createXAxis(start, end),
-    yAxis: { type: 'value' },
+    yAxis: yAxisConfig,
     series: [
       {
         name: title,
@@ -1616,35 +1700,53 @@ function createSingleOption(
 }
 
 function createSwallowOption(
-  swallow: [number, number][],
-  risk: [number, number][],
+  dysphagia: [number, number][],
+  aspiration: [number, number][],
   start: number,
   end: number
 ): echarts.EChartsOption {
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-    legend: { data: ['吞咽段识别', '吞咽风险概率'], top: 8, itemGap: 4 },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+      formatter: (params: any) => {
+        let result = `时间: ${params[0].axisValue.toFixed(2)}s<br/>`
+        params.forEach((item: any) => {
+          const value = (item.value[1] * 100).toFixed(1)
+          result += `${item.marker}${item.seriesName}: ${value}%<br/>`
+        })
+        return result
+      },
+    },
+    legend: { data: ['吞咽障碍概率', '误吸概率'], top: 8, itemGap: 4 },
     grid: { top: 40, bottom: 24, left: 40, right: 20 },
     xAxis: createXAxis(start, end),
-    yAxis: { type: 'value', min: 0, max: 1 },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 1,
+      axisLabel: {
+        formatter: (value: number) => `${(value * 100).toFixed(0)}%`,
+      },
+    },
     series: [
       {
-        name: '吞咽段识别',
+        name: '吞咽障碍概率',
         type: 'line',
         showSymbol: false,
-        lineStyle: { width: 2, color: '#9B59B6' },
-        data: swallow,
+        lineStyle: { width: 2, color: '#E67E22' },
+        data: dysphagia,
         animation: false,
         sampling: 'lttb',
         progressive: 2000,
         progressiveThreshold: 3000,
       },
       {
-        name: '吞咽风险概率',
+        name: '误吸概率',
         type: 'line',
         showSymbol: false,
-        lineStyle: { width: 2, color: '#E67E22' },
-        data: risk,
+        lineStyle: { width: 2, color: '#FF4D4F' },
+        data: aspiration,
         animation: false,
         sampling: 'lttb',
         progressive: 2000,
@@ -1831,6 +1933,21 @@ function createSingleOptionFile(
     呼吸信号: '#FAC858',
     吞咽声音信号: '#73C0DE',
   }
+  
+  // 呼吸信号使用以0为中心的Y轴
+  const yAxisConfig = title === '呼吸信号' 
+    ? { 
+        type: 'value' as const, 
+        min: -50, 
+        max: 50,
+        axisLine: {
+          show: true,
+          onZero: true,
+          lineStyle: { color: '#999' }
+        }
+      }
+    : { type: 'value' as const }
+  
   return {
     tooltip: {
       trigger: 'axis',
@@ -1851,7 +1968,7 @@ function createSingleOptionFile(
     legend: { data: [title], top: 8, itemGap: 4 },
     grid: { top: 40, bottom: 24, left: 40, right: 20 },
     xAxis: createXAxisAuto(),
-    yAxis: { type: 'value' },
+    yAxis: yAxisConfig,
     series: [
       {
         name: title,
@@ -1919,16 +2036,26 @@ function frame(now: number = performance.now()) {
   const endLong = +(startLong + durationLong).toFixed(3)
 
   // WebSocket 实时数据已经在接收时限制了数量,这里不需要 prune
-  // 只 prune 音频和吞咽相关数据(这些还是使用模拟数据)
+  // 只 prune 音频和吞咽相关数据
   pruneSeries(audioSeries.value, startShort)
-  pruneSeries(swallowSeries, startLong)
-  pruneSeries(riskSeries, startLong)
+  pruneSeries(dysphagiaRealtimeSeries, startLong)
+  pruneSeries(aspirationRealtimeSeries, startLong)
+
+  // 如果数据为空或最后一个点的时间小于当前时间-1秒，添加一个0值点保持图表连续
+  // 注意：这里使用1秒的间隔，避免与预测结果的数据点冲突
+  if (
+    dysphagiaRealtimeSeries.length === 0 ||
+    dysphagiaRealtimeSeries[dysphagiaRealtimeSeries.length - 1][0] < tSec - 1.0
+  ) {
+    dysphagiaRealtimeSeries.push([tSec, 0])
+    aspirationRealtimeSeries.push([tSec, 0])
+  }
 
   // WebSocket 实时模式下不使用模拟数据
-  // 实时数据由 handleRealtimeImuData 和 handleRealtimeGasData 直接添加到序列中
-  // 这里只处理音频数据（音频还是使用模拟数据）
+  // 实时数据由 handleRealtimeImuData、handleRealtimeGasData、handleRealtimeAudioData
+  // 和 handleRealtimePredictionResult 直接添加到序列中
 
-  // 注释掉模拟的 IMU、GAS 和 AUDIO 数据推送,避免干扰 WebSocket 实时数据
+  // 注释掉所有模拟数据推送,避免干扰 WebSocket 实时数据
   /*
   const imuBase = Number(imuRows[0]?.time || 0)
   while (
@@ -1964,8 +2091,8 @@ function frame(now: number = performance.now()) {
     const t = i / sampleRate
     audioSeries.value.push([t, audioDataBuffer[i] * 5])
   }
-  */
 
+  // 吞咽数据也不使用模拟数据，改为从 WebSocket 接收
   while (
     swallowIdx < swallowRows.length &&
     swallowRows[swallowIdx].time <= tSec
@@ -1985,12 +2112,13 @@ function frame(now: number = performance.now()) {
     } else inSwallow = false
     swallowIdx++
   }
+  */
 
   // WebSocket 实时数据已经在接收时限制了数量,这里不需要 cap
   // 只 cap 音频和吞咽相关数据
   capSeries(audioSeries.value, 10000)
-  capSeries(swallowSeries, 4000)
-  capSeries(riskSeries, 4000)
+  capSeries(dysphagiaRealtimeSeries, 4000)
+  capSeries(aspirationRealtimeSeries, 4000)
 
   // 实时模式: 禁用动画,固定坐标轴范围
   imuChart.setOption(
@@ -2071,7 +2199,7 @@ function frame(now: number = performance.now()) {
     },
     { notMerge: false, replaceMerge: ['series'], silent: true }
   )
-  // GAS 图表: 禁用动画,固定坐标轴范围
+  // GAS 图表: 禁用动画,固定坐标轴范围,Y轴以0为中心
   gasChart.setOption(
     {
       tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
@@ -2104,13 +2232,20 @@ function frame(now: number = performance.now()) {
       },
       yAxis: {
         type: 'value',
-        min: 0,
-        max: 100, // 根据实际GAS数据范围调整
+        min: -50, // Y轴范围：-50 到 50，0在中间
+        max: 50,
         splitLine: {
           show: true,
           lineStyle: {
             color: '#f0f0f0',
             type: 'dashed',
+          },
+        },
+        axisLine: {
+          show: true,
+          onZero: true, // 在0值位置显示轴线
+          lineStyle: {
+            color: '#999',
           },
         },
       },
@@ -2168,8 +2303,8 @@ function frame(now: number = performance.now()) {
       },
       yAxis: {
         type: 'value',
-        min: -0.6,
-        max: 0.6,
+        min: -0.4,
+        max: 0.4,
         splitLine: {
           show: true,
           lineStyle: { color: '#f0f0f0', type: 'dashed' },
@@ -2191,7 +2326,12 @@ function frame(now: number = performance.now()) {
   )
   swallowChart.setOption(
     {
-      ...createSwallowOption(swallowSeries, riskSeries, startLong, endLong),
+      ...createSwallowOption(
+        dysphagiaRealtimeSeries,
+        aspirationRealtimeSeries,
+        startLong,
+        endLong
+      ),
       ...AXIS_UPDATE_ANIM,
     },
     AXIS_UPDATE_SETOPTION
@@ -2500,6 +2640,19 @@ function connectWebSocket(deviceId: string): Promise<void> {
             }
           )
 
+          // 订阅预测结果
+          stompClient?.subscribe(
+            `/topic/device/${deviceId}/prediction`,
+            (message: any) => {
+              try {
+                const result = JSON.parse(message.body)
+                handleRealtimePredictionResult(result)
+              } catch (error) {
+                console.error('解析预测结果失败:', error)
+              }
+            }
+          )
+
           resolve()
         },
         onStompError: (frame: any) => {
@@ -2601,6 +2754,184 @@ function handleRealtimeAudioData(data: {
   const maxPoints = 10000
   if (audioSeries.value.length > maxPoints) {
     audioSeries.value.shift()
+  }
+}
+
+// 处理实时预测结果
+function handleRealtimePredictionResult(result: any) {
+  console.log('收到实时预测结果:', result)
+
+  // 检查是否有错误消息
+  if (result.message) {
+    ElNotification({
+      title: '预测结果',
+      message: result.message,
+      type: 'info',
+      duration: 3000,
+    })
+    return
+  }
+
+  // 兼容两种字段名：swallowEvents（驼峰）和 swallow_events（下划线）
+  const swallowEvents = result.swallowEvents || result.swallow_events
+
+  // 检查是否检测到吞咽事件
+  if (swallowEvents && swallowEvents.length > 0) {
+    const totalEvents = swallowEvents.length
+
+    // 获取当前相对时间（秒）- 这是从检测开始到现在的总时间
+    const currentRelativeTime =
+      (performance.now() - startTime + totalElapsed) / 1000
+
+    // ✅ 使用窗口结束时间（当前时间）作为基准，而不是起始时间
+    // 这样吞咽段会出现在图表的右侧（最新位置），而不是中间
+    const windowEndTime = currentRelativeTime
+
+    // 后端预测窗口长度（秒）- 需要与后端保持一致
+    const PREDICTION_WINDOW_SEC = 5
+
+    console.log('当前相对时间:', currentRelativeTime.toFixed(2), 's')
+    console.log('窗口结束时间:', windowEndTime.toFixed(2), 's')
+    console.log('预测窗口长度:', PREDICTION_WINDOW_SEC, 's')
+
+    // 将相对于预测窗口的时间转换为相对于检测开始的绝对时间
+    // 使用窗口结束时间减去事件在窗口中的相对位置
+    const events = swallowEvents.map(([start, end]: [number, number]) => [
+      windowEndTime - (PREDICTION_WINDOW_SEC - start / 1000), // 窗口结束时间 - 距离窗口结束的时间
+      windowEndTime - (PREDICTION_WINDOW_SEC - end / 1000),
+    ])
+
+    console.log('转换后的事件时间:', events)
+
+    // 统计本次检测结果
+    let aspirationCount = 0
+    let dysphagiaCount = 0
+    const aspirationEvents: { time: string; label: string }[] = []
+
+    // 统计误吸
+    if (result.aspiration) {
+      result.aspiration.forEach((asp: any, idx: number) => {
+        if (asp.predicted_class === 1 && events[idx]) {
+          aspirationCount++
+          const [start, end] = events[idx]
+          aspirationEvents.push({
+            time: `${start.toFixed(1)}s - ${end.toFixed(1)}s`,
+            label: asp.label,
+          })
+        }
+      })
+    }
+
+    // 统计吞咽障碍
+    if (result.dysphagia) {
+      result.dysphagia.forEach((dys: any) => {
+        if (dys.predicted_class === 1) {
+          dysphagiaCount++
+        }
+      })
+    }
+
+    // 更新累计统计数据
+    realtimeStats.totalSwallows += totalEvents
+    realtimeStats.aspirationSwallows += aspirationCount
+    realtimeStats.dysphagiaSwallows += dysphagiaCount
+
+    // 如果有吞咽障碍，标记为吞咽障碍患者
+    if (dysphagiaCount > 0) {
+      realtimeStats.hasDysphagia = true
+    }
+
+    // 计算正常吞咽次数（既不是误吸也不是吞咽障碍）
+    realtimeStats.normalSwallows =
+      realtimeStats.totalSwallows -
+      Math.max(
+        realtimeStats.aspirationSwallows,
+        realtimeStats.dysphagiaSwallows
+      )
+
+    console.log('实时统计数据:', realtimeStats)
+
+    // 更新图表数据
+    events.forEach(([start, end]: [number, number], idx: number) => {
+      // 获取吞咽障碍概率（取第二个类别的概率，即 predicted_class=1 的概率）
+      let dysphagiaProb = 0
+      if (result.dysphagia && result.dysphagia[idx]) {
+        dysphagiaProb = result.dysphagia[idx].probabilitys[1] || 0
+      }
+
+      // 获取误吸概率（取第二个类别的概率，即 predicted_class=1 的概率）
+      let aspirationProb = 0
+      if (result.aspiration && result.aspiration[idx]) {
+        aspirationProb = result.aspiration[idx].probabilitys[1] || 0
+      }
+
+      // 移除与新数据时间重叠的旧数据点
+      const lastTime =
+        dysphagiaRealtimeSeries.length > 0
+          ? dysphagiaRealtimeSeries[dysphagiaRealtimeSeries.length - 1][0]
+          : -1
+
+      // 如果最后一个点的时间在新事件的时间范围内，移除它
+      while (
+        dysphagiaRealtimeSeries.length > 0 &&
+        dysphagiaRealtimeSeries[dysphagiaRealtimeSeries.length - 1][0] >=
+          start - 0.2
+      ) {
+        dysphagiaRealtimeSeries.pop()
+        aspirationRealtimeSeries.pop()
+      }
+
+      // 在吞咽段开始前添加一个0值点
+      dysphagiaRealtimeSeries.push([start - 0.1, 0])
+      aspirationRealtimeSeries.push([start - 0.1, 0])
+
+      // 在吞咽段的时间范围内添加数据点
+      const step = 0.1 // 100ms步长
+      for (let t = start; t <= end; t = +(t + step).toFixed(3)) {
+        // 添加吞咽障碍概率数据
+        dysphagiaRealtimeSeries.push([t, dysphagiaProb])
+
+        // 添加误吸概率数据
+        aspirationRealtimeSeries.push([t, aspirationProb])
+      }
+
+      // 在吞咽段结束后添加一个0值点，形成下降
+      dysphagiaRealtimeSeries.push([end + 0.1, 0])
+      aspirationRealtimeSeries.push([end + 0.1, 0])
+    })
+
+    console.log(
+      '更新后的 dysphagiaRealtimeSeries 长度:',
+      dysphagiaRealtimeSeries.length
+    )
+    console.log('最后几个点:', dysphagiaRealtimeSeries.slice(-5))
+
+    // 显示通知
+    if (aspirationCount > 0) {
+      const timeList = aspirationEvents.map((e) => e.time).join('、')
+      ElNotification({
+        title: '⚠️ 危险提示',
+        message: `实时检测: 发现 ${totalEvents} 段吞咽事件，其中 ${aspirationCount} 段存在误吸风险！\n时间段：${timeList}`,
+        type: 'error',
+        duration: 8000,
+        showClose: true,
+      })
+
+      // 显示风险提示
+      // const maxRisk = Math.max(
+      //   ...result.aspiration
+      //     .filter((asp: any) => asp.predicted_class === 1)
+      //     .map((asp: any) => asp.probabilitys[1] || 0)
+      // )
+      // showRiskAlert(maxRisk)
+    } else {
+      ElNotification({
+        title: '预测结果',
+        message: `实时检测: 发现 ${totalEvents} 段吞咽事件，未发现误吸风险`,
+        type: 'success',
+        duration: 3000,
+      })
+    }
   }
 }
 

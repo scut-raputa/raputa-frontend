@@ -30,9 +30,10 @@
       <div class="report-section">
         <h4>总览信息</h4>
         <p>
-          吞咽次数共计 {{ report.totalSwallows }} 次，其中正常吞咽次数
-          {{ report.normalSwallows }} 次，异常吞咽次数
-          {{ report.abnormalSwallows }} 次。
+          <strong>诊断结果：{{ report.diagnosis }}</strong>
+        </p>
+        <p>
+          本次检测共记录 {{ report.totalSwallows }} 次吞咽事件，其中困难吞咽（吞咽障碍）次数：{{ report.dysphagiaSwallows }} 次，误吸次数：{{ report.aspirationSwallows }} 次，正常吞咽次数：{{ report.normalSwallows }} 次。
         </p>
       </div>
 
@@ -86,6 +87,9 @@ export interface ReportData {
   totalSwallows: number
   normalSwallows: number
   abnormalSwallows: number
+  dysphagiaSwallows: number
+  aspirationSwallows: number
+  diagnosis: string
   riskLevel: string
   suggestions: string[]
   doctor: string
