@@ -4,7 +4,7 @@
     <div class="header-center">
       <img src="@/assets/hospital-logo.svg" class="report-logo" />
       <div class="header-texts">
-        <div class="report-title">xx医院</div>
+        <div class="report-title">{{ hospitalName }}</div>
         <div class="report-subtitle">吞咽障碍检测报告</div>
       </div>
     </div>
@@ -65,16 +65,27 @@
 
     <!-- Footer -->
     <div class="spacer" />
-    <div class="report-footer">
-      <div>报告医生：{{ report.doctor }}</div>
-      <div class="report-time">报告时间：{{ report.time }}</div>
-    </div>
+      <div class="report-footer">
+        <div class="doctor-field">
+          <span>报告医生：</span>
+          <template v-if="editingMode">
+            <input
+              v-model="doctorText"
+              class="doctor-input editable"
+              placeholder="请填写医生姓名"
+            />
+          </template>
+          <span v-else class="doctor-plain">{{ doctorText }}</span>
+        </div>
+        <div class="report-time">报告时间：{{ report.time }}</div>
+      </div>
     <hr class="divider" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { getUser } from '@/utils/auth'
 
 export interface ReportData {
   name: string
@@ -96,6 +107,9 @@ export interface ReportData {
   time: string
 }
 
+const user = getUser()
+const hospitalName = user?.hospitalName || 'xx医院'
+
 const { report, editingMode = true } = defineProps<{
   report: ReportData
   editingMode?: boolean
@@ -104,7 +118,24 @@ const { report, editingMode = true } = defineProps<{
 const reportContent = ref<HTMLDivElement | null>(null)
 const suggestionText = ref(report.suggestions.join('\n'))
 
-defineExpose({ reportContent, suggestionText })
+// 新增：医生姓名的可编辑文本
+const doctorText = ref(report.doctor || '')
+
+// 如果父组件更新了 report.doctor，同步过来
+watch(
+  () => report.doctor,
+  (val) => {
+    if (val != null && val !== doctorText.value) {
+      doctorText.value = val
+    }
+  }
+)
+
+defineExpose({
+  reportContent,
+  suggestionText,
+  doctorText, // 暴露给外面（Monitor.vue）读取
+})
 </script>
 
 <style scoped>
@@ -231,5 +262,27 @@ defineExpose({ reportContent, suggestionText })
 
 .report-time {
   text-align: right;
+}
+
+.doctor-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.doctor-input {
+  border: 2px dashed #999;
+  background-color: #fafafa;
+  padding: 2px 6px;
+  min-width: 120px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.doctor-plain {
+  min-width: 120px;
+  display: inline-block;
 }
 </style>

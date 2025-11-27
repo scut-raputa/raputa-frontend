@@ -5,7 +5,7 @@
       <el-card shadow="hover" class="stat-card">
         <div class="stat-body">
           <div class="stat-left">
-            <el-statistic :value="10">
+            <el-statistic :value="20">
               <template #title>
                 <div class="stat-title">
                   模型总数

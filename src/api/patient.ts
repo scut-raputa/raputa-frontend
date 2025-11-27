@@ -5,6 +5,7 @@ import type { PatientRow, PageWrap } from '@/types/patient'
 export interface PatientQuery {
   page: number
   size: number
+  id?: string
   name?: string
   dept?: string
   address?: string
@@ -30,6 +31,11 @@ function unwrap<T>(resp: ApiResponse<T>): T {
 export async function listPatients(params: PatientQuery) {
   const resp = await getJson<PageWrap<PatientRow>>('/api/patient', { params })
   return unwrap(resp)
+}
+
+export async function getPatientById(id: string): Promise<PatientRow | null> {
+  const page = await listPatients({ page: 1, size: 1, id })
+  return page.items[0] ?? null
 }
 
 export interface CreatePatientPayload {

@@ -251,7 +251,7 @@
               :show-file-list="false"
               :disabled="!isFileMode"
               accept=".csv"
-              :on-change="(file) => handleCsvSelect(file, 'imu')"
+              :on-change="handleImuCsvChange"
             >
               <el-tooltip
                 content="仅在文件模式下上传，格式为.csv（服务器将临时保存）"
@@ -271,7 +271,7 @@
               :show-file-list="false"
               :disabled="!isFileMode"
               accept=".csv"
-              :on-change="(file) => handleCsvSelect(file, 'gas')"
+              :on-change="handleGasCsvChange"
             >
               <el-tooltip
                 content="仅在文件模式下上传，格式为.csv（服务器将临时保存）"
@@ -522,7 +522,7 @@
       </el-form-item>
 
       <!-- 列映射：声音信号 -->
-      <el-form-item v-if="currentSignalType === 'audio'" label="声音信号映射">
+      <!-- <el-form-item v-if="currentSignalType === 'audio'" label="声音信号映射">
         <el-select
           v-model="csvConfigForm.audioCol"
           placeholder="选择声音信号对应列"
@@ -537,7 +537,7 @@
             :value="key"
           />
         </el-select>
-      </el-form-item>
+      </el-form-item> -->
     </el-form>
 
     <!-- 弹窗底部按钮 -->
@@ -589,6 +589,14 @@ import {
 import { uploadAndPredict, type DetectionResponse } from '@/api/detect'
 import SockJS from 'sockjs-client'
 import { Client, type Frame } from '@stomp/stompjs'
+import { getUser } from '@/utils/auth'
+import type { UserVO } from '@/types/user'
+
+import { listPatients, getPatientById } from '@/api/patient'
+import type { PatientRow } from '@/types/patient'
+
+import { uploadReportPdf } from '@/api/report'
+
 import axios from 'axios'
 
 type PatientOption = { value: string; label: string; id: string; name: string }
@@ -602,11 +610,123 @@ const selectedPatientName = computed(() => {
   return hit?.name ?? ''
 })
 
+// 当前登录用户（从 localStorage 读取一次即可）
+const currentUser = ref<UserVO | null>(getUser())
+
+// 当前登录账号所在科室 / 医院
+const currentDepartmentName = computed(
+  () => currentUser.value?.departmentName ?? ''
+)
+const currentHospitalName = computed(
+  () => currentUser.value?.hospitalName ?? ''
+)
+
+const isDownloadingReport = ref(false)
+
+interface PatientDetail {
+  id: string
+  name: string
+  gender?: string
+  age?: number
+  outpatientId?: string
+}
+
+// 当前选中患者详情（还没接后端的话，就先留 null）
+const currentPatient = ref<PatientDetail | null>(null)
+
+async function fetchPatientDetailById(id: string) {
+  if (!id) {
+    currentPatient.value = null
+    return
+  }
+  try {
+    const p = await getPatientById(id)
+    if (p) {
+      currentPatient.value = {
+        id: p.id,
+        name: p.name,
+        gender: (p as any).gender,                  // 后端若返回 '男'/'女'
+        age: p.age ?? undefined,
+        // outpatientId 现在可能还没加到 PatientRow，先尝试从返回体里取一下
+        outpatientId: (p as any).outpatientId ?? undefined,
+      }
+    } else {
+      // 没查到就用下拉里的名字兜底
+      currentPatient.value = {
+        id,
+        name: selectedPatientName.value || '',
+      }
+    }
+  } catch (e) {
+    console.error('获取患者详情失败:', e)
+    currentPatient.value = {
+      id,
+      name: selectedPatientName.value || '',
+    }
+  }
+}
+
 // 合并并按 id 去重
 function mergeById(a: any[], b: any[]) {
   const map = new Map<string, any>()
   ;[...a, ...b].forEach(p => map.set(p.id, p))
   return Array.from(map.values())
+}
+
+// === 将本次检测结果写入后台 ===
+// 规则：dys>0 写 DYSPHAGIA；asp>0 写 ASPIRATION；二者均为0时写 NORMAL（仅一条）
+// 注意：后端不需要次数，只有一条纪录/类别；staff 来自报告里的“报告医生”
+async function persistCheckRecords() {
+  const d = realtimeStats.dysphagiaSwallows
+  const a = realtimeStats.aspirationSwallows
+  const patientId = selectedPatientId.value
+  const patientName = selectedPatientName.value
+  const staff = reportData.value.doctor?.trim() || ''   // ★ 从报告医生读取
+
+  if (!patientId || !patientName) {
+    ElMessage.error('缺少患者信息，无法写入检测记录')
+    return
+  }
+  if (!staff) {
+    ElMessage.error('缺少报告医生(staff)，请先完善报告信息')
+    return
+  }
+
+  const records: Array<{
+    patientId: string
+    name: string
+    staff: string
+    result: 'DYSPHAGIA' | 'ASPIRATION' | 'NORMAL'
+    // checkTime?: string  // 可不传，服务端用上海时区当前时间
+  }> = []
+
+  if (d > 0) {
+    records.push({ patientId, name: patientName, staff, result: 'DYSPHAGIA' })
+  }
+  if (a > 0) {
+    records.push({ patientId, name: patientName, staff, result: 'ASPIRATION' })
+  }
+  if (d === 0 && a === 0) {
+    records.push({ patientId, name: patientName, staff, result: 'NORMAL' })
+  }
+  if (records.length === 0) return
+
+  try {
+    await axios.post('/api/check/batch', records)
+    ElMessage.success('检测记录已保存')
+  } catch (err: any) {
+    // 后端若没开 batch，也可降级单条提交
+    try {
+      for (const r of records) await axios.post('/api/check', r)
+      ElMessage.success('检测记录已保存')
+    } catch (e: any) {
+      ElNotification({
+        title: '记录保存失败',
+        message: e?.message || '请稍后重试',
+        type: 'error',
+      })
+    }
+  }
 }
 
 // —— 稳妥版：分别按 id 和 name 搜，合并结果 ——
@@ -618,8 +738,8 @@ async function fetchPatients(keyword = '') {
 
     // 空关键字：拉一页最近入院的
     if (!keyword.trim()) {
-      const { data } = await axios.get('/api/patient', { params: base })
-      const items = data?.data?.items ?? []
+      const page = await listPatients(base)
+      const items = page.items ?? []
       patientOptions.value = items.map((p: any) => ({
         value: p.id,
         label: `${p.id} - ${p.name}`,
@@ -631,13 +751,13 @@ async function fetchPatients(keyword = '') {
 
     // 非空：并行两次请求（按 id 和按 name）
     const kw = keyword.trim()
-    const [byId, byName] = await Promise.all([
-      axios.get('/api/patient', { params: { ...base, id: kw } }),
-      axios.get('/api/patient', { params: { ...base, name: kw } }),
+    const [byIdPage, byNamePage] = await Promise.all([
+      listPatients({ ...base, id: kw }),
+      listPatients({ ...base, name: kw }),
     ])
 
-    const itemsId = byId?.data?.data?.items ?? []
-    const itemsName = byName?.data?.data?.items ?? []
+    const itemsId = byIdPage.items ?? []
+    const itemsName = byNamePage.items ?? []
     const merged = mergeById(itemsId, itemsName)
 
     patientOptions.value = merged.map((p: any) => ({
@@ -659,6 +779,17 @@ const remotePatientQuery = (q: string) => {
   if ((remotePatientQuery as any)._t) clearTimeout((remotePatientQuery as any)._t)
   ;(remotePatientQuery as any)._t = setTimeout(() => fetchPatients(q), 200)
 }
+
+watch(
+  selectedPatientId,
+  (id) => {
+    if (id) {
+      fetchPatientDetailById(id)
+    } else {
+      currentPatient.value = null
+    }
+  }
+)
 
 // 首次展开下拉时拉一页
 function onPatientSelectVisible(visible: boolean) {
@@ -750,7 +881,7 @@ const realtimeStats = reactive({
 })
 
 const reportDialogVisible = ref(false)
-const reportRef = ref<HTMLElement | null>(null)
+const reportRef = ref<InstanceType<typeof MedicalReport> | null>(null)
 
 // 上传组件ref
 const imuUploadRef = ref<any>(null)
@@ -808,7 +939,7 @@ const csvConfigForm = ref({
   sampleRate: 4000,
   imuAxisMap: { X: '', Y: '', Z: '' },
   gasCol: '',
-  audioCol: '',
+  // audioCol: '',
 })
 const csvConfigFormRef = ref<FormInstance | null>(null)
 
@@ -1037,8 +1168,48 @@ function getBeijingTimestamp(includeTime = true) {
 }
 
 function openReportDialog() {
-  // 更新报告数据
-  reportData.value.name = selectedPatientName.value
+  const patient = currentPatient.value
+
+  // 🟡 统一用这一刻的时间作为“检测时间”和“检测编号”的时间基准
+  const now = new Date()
+
+  // 患者基本信息：优先用当前患者详情，没有就退回下拉里的名字/原值
+  reportData.value.name =
+    patient?.name || selectedPatientName.value || reportData.value.name
+
+  reportData.value.gender =
+    (patient?.gender as string | undefined) || reportData.value.gender
+
+  reportData.value.age =
+    typeof patient?.age === 'number' ? patient!.age : reportData.value.age
+
+  // 门诊号（不能手填，等后端补到患者详情里；目前先尝试从 patient.outpatientId 读）
+  reportData.value.outpatientId =
+    patient?.outpatientId || reportData.value.outpatientId
+
+  // 申请科室：当前登录用户所在科室
+  reportData.value.department = currentDepartmentName.value
+
+  // 🟡 检测时间：显示在患者信息栏的“检测时间”
+  reportData.value.date = formatDateTime(now)
+
+  // 🟡 检测编号：R[patientId][yyyymmddhhmmss]
+  // patientId 优先用 currentPatient.id，其次 selectedPatientId，兜底用 '000000'
+  const pid =
+    patient?.id || selectedPatientId.value || reportData.value.outpatientId || '000000'
+
+  const pad2 = (n: number) => String(n).padStart(2, '0')
+  const yyyy = now.getFullYear()
+  const MM = pad2(now.getMonth() + 1)
+  const dd = pad2(now.getDate())
+  const hh = pad2(now.getHours())
+  const mm = pad2(now.getMinutes())
+  const ss = pad2(now.getSeconds())
+  const ts = `${yyyy}${MM}${dd}${hh}${mm}${ss}`
+
+  reportData.value.reportId = `R${pid}${ts}`
+
+  // 检测统计数据
   reportData.value.totalSwallows = realtimeStats.totalSwallows
   reportData.value.normalSwallows = realtimeStats.normalSwallows
   reportData.value.dysphagiaSwallows = realtimeStats.dysphagiaSwallows
@@ -1063,7 +1234,7 @@ function openReportDialog() {
     reportData.value.riskLevel = '高风险'
   }
 
-  // 根据风险等级生成建议措施
+  // 根据风险等级生成建议措施（保持你原来的逻辑）
   const suggestions: string[] = []
 
   if (reportData.value.riskLevel === '高风险') {
@@ -1093,48 +1264,176 @@ function openReportDialog() {
   reportDialogVisible.value = true
 }
 
-function downloadReport() {
+async function downloadReport() {
+  const comp = reportRef.value as any
+  if (!comp) {
+    ElMessage.error('报告组件未就绪，请稍后重试')
+    return
+  }
+
+  // 处理 reportContent 引用：既兼容暴露 ref，也兼容已解包成 DOM
+  let content: HTMLDivElement | null = null
+  const rawContent = comp.reportContent
+  if (rawContent instanceof HTMLElement) {
+    content = rawContent as HTMLDivElement
+  } else if (rawContent && rawContent.value instanceof HTMLElement) {
+    content = rawContent.value as HTMLDivElement
+  }
+  if (!content) {
+    ElMessage.error('报告内容尚未渲染完成')
+    return
+  }
+
+  // === 1）从子组件拿“医生姓名”和“建议措施” ===
+  const rawDoctor = comp.doctorText
+  const rawSuggestion = comp.suggestionText
+
+  const doctorName = (
+    typeof rawDoctor === 'string'
+      ? rawDoctor
+      : rawDoctor?.value ?? ''
+  ).trim()
+
+  const suggestionStr: string =
+    typeof rawSuggestion === 'string'
+      ? rawSuggestion
+      : rawSuggestion?.value ?? ''
+
+  // === 1.5）前端预警：医生姓名没填写，禁止下载 ===
+  if (!doctorName) {
+    ElMessage.warning('请先在报告中填写“报告医生”后再下载')
+    return
+  }
+
+  // === 2）防止多次触发：下载中直接返回 ===
+  if (isDownloadingReport.value) {
+    return
+  }
+  isDownloadingReport.value = true
+
+  // 报告时间：单独一栏“报告时间”
   reportData.value.time = formatDateTime(new Date())
-  const content = (reportRef.value as any)?.reportContent
-  if (!content) return
+
+  // 同步数据到 reportData（供持久化 & 下次打开时回填）
+  reportData.value.doctor = doctorName
+  if (suggestionStr) {
+    reportData.value.suggestions = suggestionStr.split('\n')
+  } else {
+    reportData.value.suggestions = []
+  }
+
+  // === 3）先写入检测记录（需要 staff = doctor） ===
+  await persistCheckRecords()
+
+  // === 4）为了导出 PDF，临时把输入框 / 文本域换成纯文本节点 ===
+  const doctorInput = content.querySelector(
+    '.doctor-input'
+  ) as HTMLInputElement | null
+
+  let doctorParent: ParentNode | null = null
+  let doctorSpan: HTMLSpanElement | null = null
+
+  if (doctorInput) {
+    doctorParent = doctorInput.parentNode
+    doctorSpan = document.createElement('span')
+    doctorSpan.className = 'doctor-plain'
+    doctorSpan.textContent = doctorName
+    if (doctorParent) {
+      doctorParent.replaceChild(doctorSpan, doctorInput)
+    }
+  }
+
   const textarea = content.querySelector(
     '.suggestion-text'
-  ) as HTMLTextAreaElement
-  if (!textarea) return
-  const text = textarea.value
-  const pre = document.createElement('pre')
-  pre.className = 'suggestion-plain'
-  pre.textContent = text
-  Object.assign(pre.style, {
-    fontFamily: '"Microsoft YaHei", sans-serif',
-    fontSize: '13px',
-    lineHeight: '1.6',
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
-    overflowWrap: 'break-word',
-    border: 'none',
-    background: 'none',
-    padding: '0',
-    margin: '0',
-    width: '100%',
-    flex: '1',
-  })
-  const parent = textarea.parentNode
-  if (!parent) return
-  parent.replaceChild(pre, textarea)
+  ) as HTMLTextAreaElement | null
+
+  let parent: ParentNode | null = null
+  let pre: HTMLPreElement | null = null
+
+  if (textarea) {
+    pre = document.createElement('pre')
+    pre.className = 'suggestion-plain'
+    pre.textContent = suggestionStr
+    Object.assign(pre.style, {
+      fontFamily: '"Microsoft YaHei", sans-serif',
+      fontSize: '13px',
+      lineHeight: '1.6',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      overflowWrap: 'break-word',
+      border: 'none',
+      background: 'none',
+      padding: '0',
+      margin: '0',
+      width: '100%',
+      flex: '1',
+    })
+    parent = textarea.parentNode
+    if (parent) {
+      parent.replaceChild(pre, textarea)
+    }
+  }
+
   const filename = `吞咽报告_${reportData.value.name}_${getBeijingTimestamp(
     true
   )}.pdf`
-  html2pdf()
-    .set({
-      margin: 0,
-      filename,
-      html2canvas: { scale: 10 },
-      jsPDF: { unit: 'px', format: [794, 1123] },
-    })
-    .from(content)
-    .save()
-    .then(() => parent.replaceChild(textarea, pre))
+
+  try {
+    // === 5）用 html2pdf 生成 PDF worker ===
+    const worker = (html2pdf() as any)
+      .set({
+        margin: 0,
+        filename,
+        html2canvas: { scale: 10 },
+        jsPDF: { unit: 'px', format: [794, 1123] },
+      })
+      .from(content)
+      .toPdf()
+
+    // 5.1 拿到 Blob，上传后端登记 PatientFile（不会触发下载）
+    const pdfBlob: Blob = await worker.output('blob')
+
+    const pid = selectedPatientId.value
+    const pname =
+      currentPatient.value?.name ||
+      selectedPatientName.value ||
+      reportData.value.name ||
+      ''
+
+    if (!pid) {
+      ElNotification({
+        title: '提示',
+        message: '未选中患者，无法将报告写入患者文件档案，但仍会下载 PDF',
+        type: 'warning',
+      })
+    } else {
+      uploadReportPdf(pid, pname, pdfBlob, filename).catch(e => {
+        ElNotification({
+          title: '报告登记失败',
+          message:
+            e?.message ||
+            'PDF 已下载，但未写入 PatientFile，请及时联系管理员补录。',
+          type: 'warning',
+        })
+      })
+    }
+
+    // 5.2 真正触发浏览器下载
+    await worker.save()
+
+    // 5.3 下载完成后关闭预览弹窗
+    reportDialogVisible.value = false
+  } finally {
+    // === 6）恢复 DOM（把 span/pre 换回原来的 input/textarea） ===
+    if (parent && pre && textarea) {
+      parent.replaceChild(textarea, pre)
+    }
+    if (doctorParent && doctorSpan && doctorInput) {
+      doctorParent.replaceChild(doctorInput, doctorSpan)
+    }
+
+    isDownloadingReport.value = false
+  }
 }
 
 //==================== 核心可用性：开始按钮条件 ====================
@@ -1225,7 +1524,7 @@ function resetCsvState() {
     sampleRate: 4000,
     imuAxisMap: { X: '', Y: '', Z: '' },
     gasCol: '',
-    audioCol: '',
+    // audioCol: '',
   }
   imuAxisUsed.value = { X: false, Y: false, Z: false }
   filePayloadReady.value = false
@@ -1280,7 +1579,7 @@ function setDefaultMapping(signalType: 'imu' | 'gas') {
     sampleRate: 4000,
     imuAxisMap: { X: '', Y: '', Z: '' },
     gasCol: '',
-    audioCol: '',
+    // audioCol: '',
   }
 
   if (signalType === 'imu') {
@@ -1801,7 +2100,7 @@ function createSwallowRiskOptionFile(
   swallowSegments: [number, number][]
 ): echarts.EChartsOption {
   // 生成吞咽段遮罩数据
-  const markAreas = swallowSegments.map(([start, end]) => [
+  const markAreas: any = swallowSegments.map(([start, end]) => [
     { xAxis: start, itemStyle: { color: 'rgba(128, 128, 128, 0.15)' } },
     { xAxis: end },
   ])
@@ -1836,7 +2135,7 @@ function createSwallowRiskOptionFile(
         type: 'line',
         showSymbol: false,
         lineStyle: { width: 2, color: '#E67E22' },
-        data: dysphagia,
+        data: markAreas as any,
         animation: false,
         sampling: 'lttb',
         progressive: 2000,
@@ -3010,7 +3309,7 @@ async function submitCsvMappingToServer() {
     sampleRate: csvConfigForm.value.sampleRate,
     imuAxisMap: csvConfigForm.value.imuAxisMap,
     gasCol: csvConfigForm.value.gasCol,
-    audioCol: csvConfigForm.value.audioCol,
+    // audioCol: csvConfigForm.value.audioCol,
   }
   await submitCsvMapping(currentTempId.value, payload)
   // 用完就清掉本次“待提交映射”的 id
@@ -3075,6 +3374,9 @@ const handleCsvSelect = async (file: UploadFile, signalType: 'imu' | 'gas') => {
   }
   reader.readAsText(raw)
 }
+
+const handleImuCsvChange = (file: UploadFile) => handleCsvSelect(file, 'imu')
+const handleGasCsvChange = (file: UploadFile) => handleCsvSelect(file, 'gas')
 
 // 清除上传组件的文件列表
 function clearUploadFileList(signalType: 'imu' | 'gas') {
@@ -3178,7 +3480,8 @@ const submitCsvConfig = async () => {
   const valid = await csvConfigFormRef.value.validate()
   if (!valid) return
 
-  const { sampleRate, imuAxisMap, gasCol, audioCol } = csvConfigForm.value
+  // const { sampleRate, imuAxisMap, gasCol, audioCol } = csvConfigForm.value
+  const { sampleRate, imuAxisMap, gasCol } = csvConfigForm.value
   const timeStep = 1 / sampleRate
 
   // 根据当前信号类型处理数据
@@ -3311,7 +3614,7 @@ function renderAspirationMasks() {
 
   try {
     // 生成误吸段遮罩数据（红色半透明）
-    const markAreas = aspirationSegments.map(([start, end]) => [
+    const markAreas: any = aspirationSegments.map(([start, end]) => [
       { xAxis: start, itemStyle: { color: 'rgba(255, 77, 79, 0.15)' } },
       { xAxis: end },
     ])
@@ -3323,7 +3626,7 @@ function renderAspirationMasks() {
       {
         series: [
           {
-            markArea: { silent: true, data: markAreas, label: { show: false } },
+            markArea: { silent: true, data: markAreas as any, label: { show: false } },
           },
           {},
           {},
@@ -3339,7 +3642,7 @@ function renderAspirationMasks() {
           {
             markArea: {
               silent: true,
-              data: markAreas,
+              data: markAreas as any,
               label: { show: false },
             },
           },
@@ -3355,7 +3658,7 @@ function renderAspirationMasks() {
           {
             markArea: {
               silent: true,
-              data: markAreas,
+              data: markAreas as any,
               label: { show: false },
             },
           },
@@ -3430,7 +3733,7 @@ watch(isFileMode, async (newVal, oldVal) => {
     // 用户点击"继续"，执行重置
     await resetAllState()
     if (!newVal && hasChartStarted.value) initCharts() // 切回实时模式才初始化实时资源
-  } catch (error) {
+  } catch (error : any) {
     // 检查是否是用户取消
     if (error === 'cancel' || error === 'close') {
       // 用户点击"取消"，恢复原来的模式
@@ -3442,7 +3745,11 @@ watch(isFileMode, async (newVal, oldVal) => {
     } else {
       // 其他错误，显示错误信息但不恢复模式
       console.error('模式切换过程中发生错误:', error)
-      ElMessage.error('模式切换失败: ' + (error as any)?.message || error)
+      ElMessage.error(
+        '模式切换失败: ' +
+          ((error && error.message) ||
+            (typeof error === 'string' ? error : '未知错误'))
+      )
     }
   }
 })

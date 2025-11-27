@@ -1,4 +1,4 @@
-import type { UserVO } from '@/types/response'
+import type { UserVO } from '@/types/user'
 
 const TOKEN_KEY = 'raputa_token'
 const USER_KEY = 'raputa_user'
