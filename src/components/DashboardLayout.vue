@@ -77,10 +77,10 @@
               <el-icon><User /></el-icon>
               <template #title>患者管理</template>
             </el-menu-item>
-            <el-menu-item index="/dashboard/model">
+            <!-- <el-menu-item index="/dashboard/model">
               <el-icon><DataLine /></el-icon>
               <template #title>模型管理</template>
-            </el-menu-item>
+            </el-menu-item> -->
             <el-menu-item index="/dashboard/monitor">
               <el-icon><Loading /></el-icon>
               <template #title>系统监测</template>
@@ -93,14 +93,14 @@
               <el-icon><Histogram /></el-icon>
               <template #title>数据统计</template>
             </el-menu-item>
-            <el-menu-item v-if="!isAdmin" index="/dashboard/department">
+            <!-- <el-menu-item v-if="!isAdmin" index="/dashboard/department">
               <el-icon><Setting /></el-icon>
               <template #title>科室管理</template>
-            </el-menu-item>
-            <el-menu-item v-else index="/dashboard/system">
+            </el-menu-item> -->
+            <!-- <el-menu-item v-else index="/dashboard/system">
               <el-icon><Setting /></el-icon>
               <template #title>系统管理</template>
-            </el-menu-item>
+            </el-menu-item> -->
             <div class="el-menu-item toggle-item" @click="toggleCollapse">
               <el-icon>
                 <component :is="isCollapsed ? Expand : Fold" />
@@ -127,15 +127,15 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getUser, clearToken, clearUser } from '@/utils/auth'
-import type { UserVO } from '@/types/response'
+import type { UserVO } from '@/types/user'
 import {
   Fold,
   Expand,
-  DataLine,
+  // DataLine,
   User,
   Document,
   Loading,
-  Setting,
+  // Setting,
   Histogram,
   SwitchButton,
 } from '@element-plus/icons-vue'
@@ -153,7 +153,7 @@ const isCollapsed = ref(false)
 const activeMenu = ref(route.path)
 const scrollAreaRef = ref<HTMLElement | null>(null)
 
-const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
+// const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 
 watch(
   () => route.path,

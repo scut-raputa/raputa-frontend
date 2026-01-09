@@ -44,7 +44,6 @@ export interface CreatePatientPayload {
   birth: string
   dept: string
   address: string
-  checked: boolean
 }
 
 export async function createPatient(payload: CreatePatientPayload) {

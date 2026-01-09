@@ -551,7 +551,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import {
   User,
   DataLine,
@@ -561,7 +562,6 @@ import {
   VideoPause,
   Refresh,
   Tools,
-  UploadFilled,
   Delete,
   Loading,
   Histogram,
@@ -593,9 +593,9 @@ import { getUser } from '@/utils/auth'
 import type { UserVO } from '@/types/user'
 
 import { listPatients, getPatientById } from '@/api/patient'
-import type { PatientRow } from '@/types/patient'
 
 import { uploadReportPdf } from '@/api/report'
+import { finalizeRealtimeSession } from '@/api/realtime'
 
 import axios from 'axios'
 
@@ -617,9 +617,9 @@ const currentUser = ref<UserVO | null>(getUser())
 const currentDepartmentName = computed(
   () => currentUser.value?.departmentName ?? ''
 )
-const currentHospitalName = computed(
-  () => currentUser.value?.hospitalName ?? ''
-)
+// const currentHospitalName = computed(
+//   () => currentUser.value?.hospitalName ?? ''
+// )
 
 const isDownloadingReport = ref(false)
 
@@ -673,6 +673,8 @@ function mergeById(a: any[], b: any[]) {
   return Array.from(map.values())
 }
 
+const checkRecordsSaved = ref(false)
+
 // === 将本次检测结果写入后台 ===
 // 规则：dys>0 写 DYSPHAGIA；asp>0 写 ASPIRATION；二者均为0时写 NORMAL（仅一条）
 // 注意：后端不需要次数，只有一条纪录/类别；staff 来自报告里的“报告医生”
@@ -713,11 +715,13 @@ async function persistCheckRecords() {
 
   try {
     await axios.post('/api/check/batch', records)
+    checkRecordsSaved.value = true
     ElMessage.success('检测记录已保存')
   } catch (err: any) {
     // 后端若没开 batch，也可降级单条提交
     try {
       for (const r of records) await axios.post('/api/check', r)
+      checkRecordsSaved.value = true
       ElMessage.success('检测记录已保存')
     } catch (e: any) {
       ElNotification({
@@ -807,8 +811,8 @@ const firstSelectedDevice = computed(() => {
 
 // === 动态派生当前设备三要素（用于发后端，不需要额外状态）
 const currentDeviceId = computed(() => firstSelectedDevice.value?.id ?? '')
-const pickedDeviceIp = computed(() => firstSelectedDevice.value?.ip ?? '')
-const currentDeviceName = computed(() => firstSelectedDevice.value?.id ?? '')
+// const pickedDeviceIp = computed(() => firstSelectedDevice.value?.ip ?? '')
+// const currentDeviceName = computed(() => firstSelectedDevice.value?.id ?? '')
 
 const durationShort = 5
 const durationLong = 20 // 吞咽图表显示20秒窗口，避免预测延迟
@@ -1421,6 +1425,22 @@ async function downloadReport() {
     // 5.2 真正触发浏览器下载
     await worker.save()
 
+    // === 5.2.1 实时模式下：下载完成后，把本次会话文件从“临时”转“正式” ===
+    // ★ 这里用你上面定义好的 currentDeviceId 和 isFileMode
+    if (!isFileMode.value && currentDeviceId.value) {
+      try {
+        await finalizeRealtimeSession(currentDeviceId.value)
+      } catch (e: any) {
+        ElNotification({
+          title: '会话文件登记失败',
+          message:
+            e?.message ||
+            'PDF 已下载，但未能登记本次实时采集文件，请稍后在系统中检查。',
+          type: 'warning',
+        })
+      }
+    }
+
     // 5.3 下载完成后关闭预览弹窗
     reportDialogVisible.value = false
   } finally {
@@ -1460,6 +1480,13 @@ const canStart = computed(() => {
   )
 })
 
+const hasPendingReport = computed(
+  () =>
+    !isFileMode.value &&
+    hasStopped.value &&
+    !checkRecordsSaved.value
+)
+
 //==================== 实时模式相关（保留） ====================
 let totalElapsed = 0
 let startTime = 0
@@ -1477,7 +1504,7 @@ let animationId: number | null = null
 let lastRender = 0
 const FPS = 20
 const FRAME_GAP = 1000 / FPS
-const AUDIO_PLOT_HZ = 200
+// const AUDIO_PLOT_HZ = 200
 
 const AXIS_UPDATE_ANIM = {
   animation: true,
@@ -1646,6 +1673,7 @@ function resetChartAndData() {
   canReset.value = false
   isInitial.value = true
   reportDialogVisible.value = false
+  checkRecordsSaved.value = false
 
   // 重置实时统计数据
   realtimeStats.totalSwallows = 0
@@ -1799,8 +1827,8 @@ async function startDetection() {
 
 async function stopDetection() {
   // === 计算主设备（取已选列表的第一个）+ IP（从 deviceList 里找）
-  const primaryId = selectedDevice.value?.[0] || ''
-  const primaryIp = deviceList.value.find((d) => d.id === primaryId)?.ip || ''
+  // const primaryId = selectedDevice.value?.[0] || ''
+  // const primaryIp = deviceList.value.find((d) => d.id === primaryId)?.ip || ''
 
   if (isFileMode.value) {
     // 文件模式：停止"结果播放"
@@ -1815,6 +1843,7 @@ async function stopDetection() {
     }
     hasStopped.value = true
     canReset.value = true
+    checkRecordsSaved.value = false
     return
   }
 
@@ -1822,6 +1851,7 @@ async function stopDetection() {
   isDetecting.value = false
   hasStopped.value = true
   canReset.value = true
+  checkRecordsSaved.value = false
   totalElapsed += performance.now() - startTime
   if (animationId != null) {
     cancelAnimationFrame(animationId)
@@ -2135,7 +2165,7 @@ function createSwallowRiskOptionFile(
         type: 'line',
         showSymbol: false,
         lineStyle: { width: 2, color: '#E67E22' },
-        data: markAreas as any,
+        data: dysphagia,
         animation: false,
         sampling: 'lttb',
         progressive: 2000,
@@ -2284,36 +2314,36 @@ function createSingleOptionFile(
   }
 }
 
-function showRiskAlert(risk: number) {
-  let message = '' as string
-  let type: 'info' | 'warning' | 'error' = 'info'
-  if (risk >= 0.7) {
-    message = '出现高风险吞咽段，请立即关注'
-    type = 'error'
-  } else if (risk >= 0.3) {
-    message = '出现中风险吞咽段，请留意'
-    type = 'warning'
-  } else if (risk >= 0.1) {
-    message = '出现低风险吞咽段，可适当关注'
-    type = 'info'
-  }
-  if (message) {
-    ElNotification({
-      title: '风险提示',
-      message,
-      type,
-      position: 'top-right',
-      duration: 3000,
-      showClose: false,
-      customClass:
-        type === 'error'
-          ? 'risk-high'
-          : type === 'warning'
-          ? 'risk-mid'
-          : 'risk-low',
-    })
-  }
-}
+// function showRiskAlert(risk: number) {
+//   let message = '' as string
+//   let type: 'info' | 'warning' | 'error' = 'info'
+//   if (risk >= 0.7) {
+//     message = '出现高风险吞咽段，请立即关注'
+//     type = 'error'
+//   } else if (risk >= 0.3) {
+//     message = '出现中风险吞咽段，请留意'
+//     type = 'warning'
+//   } else if (risk >= 0.1) {
+//     message = '出现低风险吞咽段，可适当关注'
+//     type = 'info'
+//   }
+//   if (message) {
+//     ElNotification({
+//       title: '风险提示',
+//       message,
+//       type,
+//       position: 'top-right',
+//       duration: 3000,
+//       showClose: false,
+//       customClass:
+//         type === 'error'
+//           ? 'risk-high'
+//           : type === 'warning'
+//           ? 'risk-mid'
+//           : 'risk-low',
+//     })
+//   }
+// }
 
 //==================== 实时模式渲染帧 ====================
 function frame(now: number = performance.now()) {
@@ -3165,10 +3195,10 @@ function handleRealtimePredictionResult(result: any) {
       }
 
       // 移除与新数据时间重叠的旧数据点
-      const lastTime =
-        dysphagiaRealtimeSeries.length > 0
-          ? dysphagiaRealtimeSeries[dysphagiaRealtimeSeries.length - 1][0]
-          : -1
+      // const lastTime =
+      //   dysphagiaRealtimeSeries.length > 0
+      //     ? dysphagiaRealtimeSeries[dysphagiaRealtimeSeries.length - 1][0]
+      //     : -1
 
       // 如果最后一个点的时间在新事件的时间范围内，移除它
       while (
@@ -3234,6 +3264,17 @@ function handleRealtimePredictionResult(result: any) {
   }
 }
 
+const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+  if (hasPendingReport.value) {
+    // 有未导出的报告 ⇒ 阻止默认并提示
+    e.preventDefault()
+    // 大多数浏览器会忽略自定义文案，但必须设置 returnValue 才会弹出确认框
+    e.returnValue = ''
+  }
+  // 无论如何尝试断开 WebSocket，防止后台残留连接
+  disconnectWebSocket()
+}
+
 onMounted(() => {
   if (!hasChartStarted.value) {
     initCharts()
@@ -3244,9 +3285,7 @@ onMounted(() => {
   loading.value = false
 
   // 页面卸载时断开WebSocket
-  window.addEventListener('beforeunload', () => {
-    disconnectWebSocket()
-  })
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 //==================== 与服务器交互 ====================
@@ -3751,6 +3790,37 @@ watch(isFileMode, async (newVal, oldVal) => {
             (typeof error === 'string' ? error : '未知错误'))
       )
     }
+  }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  disconnectWebSocket()
+})
+
+onBeforeRouteLeave((to, from, next) => {
+  void to
+  void from
+  if (hasPendingReport.value) {
+    ElMessageBox.confirm(
+      '当前检测已停止但尚未导出报告，离开本页将导致本次检测记录无法写入系统。是否仍然离开？',
+      '提示',
+      {
+        type: 'warning',
+        confirmButtonText: '仍然离开',
+        cancelButtonText: '留在本页',
+      }
+    )
+      .then(() => {
+        disconnectWebSocket()
+        next()
+      })
+      .catch(() => {
+        next(false)
+      })
+  } else {
+    disconnectWebSocket()
+    next()
   }
 })
 </script>

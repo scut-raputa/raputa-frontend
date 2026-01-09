@@ -411,17 +411,6 @@
               />
             </el-form-item>
 
-            <el-form-item label="是否检测" prop="checked">
-              <el-select
-                v-model="createForm.checked"
-                placeholder="请选择"
-                :validate-event="false"
-              >
-                <el-option label="是" value="是" />
-                <el-option label="否" value="否" />
-              </el-select>
-            </el-form-item>
-
             <el-form-item label="家庭住址" prop="address">
               <el-input
                 v-model="createForm.address"
@@ -796,7 +785,6 @@ const createForm = reactive({
   gender: '' as '' | '男' | '女',
   birth: null as Date | null,
   dept: '',
-  checked: '' as '' | '是' | '否',
   address: '',
 })
 
@@ -805,7 +793,6 @@ const createRules: FormRules = {
   gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
   birth: [{ required: true, message: '请选择出生日期', trigger: 'change' }],
   dept: [{ required: true, message: '请填写所属科室', trigger: 'blur' }],
-  checked: [{ required: true, message: '请选择是否检测', trigger: 'change' }],
   address: [{ required: true, message: '请填写家庭住址', trigger: 'blur' }],
 }
 
@@ -818,7 +805,7 @@ function debounce<T extends (...args: any[]) => void>(fn: T, wait = 200) {
 }
 
 const validateFieldSilently = (
-  prop: 'name' | 'gender' | 'birth' | 'dept' | 'checked' | 'address',
+  prop: 'name' | 'gender' | 'birth' | 'dept' | 'address',
 ) => {
   createRef.value?.validateField(prop, () => {})
 }
@@ -841,10 +828,6 @@ watch(
   () => validateDebounced('dept'),
 )
 watch(
-  () => createForm.checked,
-  () => validateDebounced('checked'),
-)
-watch(
   () => createForm.address,
   () => validateDebounced('address'),
 )
@@ -855,7 +838,6 @@ function resetCreateForm() {
     gender: '' as '' | '男' | '女',
     birth: null as Date | null,
     dept: '',
-    checked: '' as '' | '是' | '否',
     address: '',
   })
 }
@@ -878,7 +860,6 @@ async function onCreateSubmit() {
       birth: formatLocalDate(createForm.birth as Date),
       dept: createForm.dept.trim(),
       address: createForm.address.trim(),
-      checked: createForm.checked === '是',
     }
     const created = await createPatient(payload)
     ElMessage.success(`添加成功（患者编号：${created.id}）`)
