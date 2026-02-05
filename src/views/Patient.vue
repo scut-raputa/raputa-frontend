@@ -420,7 +420,7 @@
               {{ row.dept ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="身份证" min-width="140">
+          <el-table-column label="身份证" min-width="120">
             <template #default="{ row }">
               {{ row.idCard ?? '-' }}
             </template>
@@ -442,24 +442,9 @@
               {{ row.onsetDate ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="既往史" min-width="145">
+          <el-table-column label="既往史" min-width="150" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-popover
-                v-if="row.pastHistory && row.pastHistory.length > 20"
-                placement="top-start"
-                trigger="hover"
-                :width="400"
-                :offset="15"
-                popper-class="patient-tooltip-popover"
-              >
-                <template #reference>
-                  <div class="table-cell-text">
-                    {{ row.pastHistory }}
-                  </div>
-                </template>
-                <div class="tooltip-content">{{ row.pastHistory }}</div>
-              </el-popover>
-              <span v-else>{{ row.pastHistory ?? '-' }}</span>
+              {{ row.pastHistory ?? '-' }}
             </template>
           </el-table-column>
           <el-table-column label="病床号" min-width="60">
@@ -467,24 +452,9 @@
               {{ row.bedNumber ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="病程" min-width="145">
+          <el-table-column label="病程" min-width="150" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-popover
-                v-if="row.course && row.course.length > 20"
-                placement="top-start"
-                trigger="hover"
-                :width="400"
-                :offset="15"
-                popper-class="patient-tooltip-popover"
-              >
-                <template #reference>
-                  <div class="table-cell-text">
-                    {{ row.course }}
-                  </div>
-                </template>
-                <div class="tooltip-content">{{ row.course }}</div>
-              </el-popover>
-              <span v-else>{{ row.course ?? '-' }}</span>
+              {{ row.course ?? '-' }}
             </template>
           </el-table-column>
           <el-table-column label="操作" width="130">
@@ -577,10 +547,9 @@
               <el-input
                 v-model="createForm.pastHistory"
                 type="textarea"
-                :rows="4"
+                :rows="2"
                 placeholder="请输入既往史"
                 :validate-event="false"
-                class="past-history-textarea"
               />
             </el-form-item>
 
@@ -596,10 +565,9 @@
               <el-input
                 v-model="createForm.course"
                 type="textarea"
-                :rows="4"
+                :rows="2"
                 placeholder="请输入病程"
                 :validate-event="false"
-                class="course-textarea"
               />
             </el-form-item>
           </el-form>
@@ -677,10 +645,9 @@
               <el-input
                 v-model="editForm.pastHistory"
                 type="textarea"
-                :rows="4"
+                :rows="2"
                 placeholder="请输入既往史"
                 :validate-event="false"
-                class="past-history-textarea"
               />
             </el-form-item>
 
@@ -696,10 +663,9 @@
               <el-input
                 v-model="editForm.course"
                 type="textarea"
-                :rows="4"
+                :rows="2"
                 placeholder="请输入病程"
                 :validate-event="false"
-                class="course-textarea"
               />
             </el-form-item>
           </el-form>
@@ -1514,66 +1480,5 @@ function cell35Style() {
 :deep(.el-table__body tr.is-filler .cell) {
   visibility: hidden;
   pointer-events: none;
-}
-
-/* 既往史和病程文本框样式 */
-:deep(.past-history-textarea .el-textarea__inner),
-:deep(.course-textarea .el-textarea__inner) {
-  min-height: 100px;
-  font-size: 14px;
-  line-height: 1.6;
-  padding: 10px 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  background-color: #fafafa;
-  color: #606266;
-  resize: vertical;
-}
-
-:deep(.past-history-textarea .el-textarea__inner:focus),
-:deep(.course-textarea .el-textarea__inner:focus) {
-  border-color: #409eff;
-  background-color: #ffffff;
-  color: #303133;
-}
-
-:deep(.past-history-textarea .el-textarea__inner:hover),
-:deep(.course-textarea .el-textarea__inner:hover) {
-  border-color: #c0c4cc;
-}
-
-/* 表格单元格文本样式 */
-.table-cell-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-/* tooltip 内容样式 - 保留换行 */
-.tooltip-content {
-  white-space: pre-line;
-  word-wrap: break-word;
-  max-width: 400px;
-}
-</style>
-
-<style>
-/* 表格悬停显示的完整内容 popover 样式 - 全局样式 */
-.el-popover.patient-tooltip-popover {
-  max-width: 400px;
-  padding: 12px 16px;
-  background-color: #ffffff;
-  color: #303133;
-  border-radius: 4px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-  border: 1px solid #e4e7ed;
-  pointer-events: none;
-}
-
-.el-popover.patient-tooltip-popover .tooltip-content {
-  white-space: pre-line;
-  word-wrap: break-word;
-  color: #303133;
 }
 </style>

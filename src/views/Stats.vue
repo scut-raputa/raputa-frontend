@@ -88,23 +88,52 @@ use([
   SVGRenderer,
 ])
 
-// 响应式数据
 const lineData = ref<DailyPatientCount[]>([])
 const barData = ref<DailyCheckResult[]>([])
 const pieData = ref<DeptPatientCount[]>([])
 const deviceUsageData = ref<DeviceUsage[]>([])
 const loading = ref(false)
 
-// 加载统计数据
+function formatDateMMDD(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}-${day}`
+}
+
+function generateDateLabels(days: number): string[] {
+  const labels: string[] = []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(today.getDate() - i)
+    labels.push(formatDateMMDD(date))
+  }
+  
+  return labels
+}
+
 const loadStats = async () => {
   loading.value = true
   try {
-    const response = await getStats({ days: 7 })
-    // 注意：axios 拦截器已经返回了 resp.data，所以这里 response 就是 ApiResponse
+    const days = 7
+    const response = await getStats({ days })
     if (response.code === 0 && response.data) {
       const data = response.data
-      lineData.value = data.dailyPatientCount || []
-      barData.value = data.dailyCheckResult || []
+      
+      const dateLabels = generateDateLabels(days)
+      
+      lineData.value = (data.dailyPatientCount || []).map((item, index) => ({
+        ...item,
+        category: dateLabels[index] || item.category,
+      }))
+      
+      barData.value = (data.dailyCheckResult || []).map((item, index) => ({
+        ...item,
+        category: dateLabels[index] || item.category,
+      }))
+      
       pieData.value = data.deptPatientCount || []
       deviceUsageData.value = data.deviceUsage || []
     } else {
@@ -118,12 +147,9 @@ const loadStats = async () => {
   }
 }
 
-// 组件挂载时加载数据
 onMounted(() => {
   loadStats()
 })
-
-// 图表配置
 const lineOption = computed(() => ({
   grid: { top: 8, bottom: 8, containLabel: true },
   xAxis: {
@@ -225,11 +251,9 @@ const pieOption = computed(() => ({
   ],
 }))
 
-// 设备使用数据处理
 const deviceIds = computed(() => deviceUsageData.value.map((d) => d.deviceId))
 const days = computed(() => lineData.value.map((d) => d.category))
 
-// 为不同设备准备一组柔和但可区分的配色
 const DEVICE_COLORS = ['#60A5FA', '#34D399', '#A78BFA', '#F472B6']
 
 const riverOption = computed(() => ({
