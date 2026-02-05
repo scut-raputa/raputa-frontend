@@ -57,7 +57,15 @@
 </template>
 
 <script setup lang="ts">
-import { lineData, barData, pieData } from '@/mock/StatsData'
+import { ref, onMounted, computed } from 'vue'
+import { getStats } from '@/api/stats'
+import type {
+  DailyPatientCount,
+  DailyCheckResult,
+  DeptPatientCount,
+  DeviceUsage,
+} from '@/api/stats'
+import { ElMessage } from 'element-plus'
 import { use } from 'echarts/core'
 import { BarChart, LineChart, PieChart, SunburstChart } from 'echarts/charts'
 import {
@@ -80,12 +88,47 @@ use([
   SVGRenderer,
 ])
 
+// 响应式数据
+const lineData = ref<DailyPatientCount[]>([])
+const barData = ref<DailyCheckResult[]>([])
+const pieData = ref<DeptPatientCount[]>([])
+const deviceUsageData = ref<DeviceUsage[]>([])
+const loading = ref(false)
+
+// 加载统计数据
+const loadStats = async () => {
+  loading.value = true
+  try {
+    const response = await getStats({ days: 7 })
+    // 注意：axios 拦截器已经返回了 resp.data，所以这里 response 就是 ApiResponse
+    if (response.code === 0 && response.data) {
+      const data = response.data
+      lineData.value = data.dailyPatientCount || []
+      barData.value = data.dailyCheckResult || []
+      pieData.value = data.deptPatientCount || []
+      deviceUsageData.value = data.deviceUsage || []
+    } else {
+      ElMessage.error(response.message || '获取统计数据失败')
+    }
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+    ElMessage.error('获取统计数据失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadStats()
+})
+
 // 图表配置
-const lineOption = {
+const lineOption = computed(() => ({
   grid: { top: 8, bottom: 8, containLabel: true },
   xAxis: {
     type: 'category',
-    data: lineData.map((d) => d.category),
+    data: lineData.value.map((d) => d.category),
     boundaryGap: ['5%', '5%'],
   },
   yAxis: {
@@ -101,7 +144,7 @@ const lineOption = {
   series: [
     {
       type: 'line',
-      data: lineData.map((d) => d.value),
+      data: lineData.value.map((d) => d.value),
       smooth: true,
       symbol: 'circle',
       symbolSize: 6,
@@ -110,16 +153,15 @@ const lineOption = {
       areaStyle: { opacity: 0.08 },
     },
   ],
-}
-const barOption = {
-  // 为了避免 legend 和 x 轴重叠，把 bottom 提高一些
+}))
+
+const barOption = computed(() => ({
   grid: { top: 8, bottom: 40, containLabel: true },
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-  // 让图例离 x 轴有空隙
   legend: { bottom: 0 },
   xAxis: {
     type: 'category',
-    data: barData.map((d) => d.category),
+    data: barData.value.map((d) => d.category),
     axisTick: { alignWithLabel: true },
     boundaryGap: true,
   },
@@ -136,17 +178,16 @@ const barOption = {
     {
       name: '正常',
       type: 'bar',
-      stack: 'total', // ★ 开启堆叠
-      data: barData.map((d) => d.normal),
-      // barWidth 不指定也可，指定能更稳一些
+      stack: 'total',
+      data: barData.value.map((d) => d.normal),
       barMaxWidth: 24,
       itemStyle: { color: '#91CC75' },
     },
     {
       name: '吞咽障碍',
       type: 'bar',
-      stack: 'total', // ★ 同一 stack 名称
-      data: barData.map((d) => d.dysphagia),
+      stack: 'total',
+      data: barData.value.map((d) => d.dysphagia),
       barMaxWidth: 24,
       itemStyle: { color: '#5470C6' },
     },
@@ -154,33 +195,24 @@ const barOption = {
       name: '误吸',
       type: 'bar',
       stack: 'total',
-      data: barData.map((d) => d.overt),
+      data: barData.value.map((d) => d.overt),
       barMaxWidth: 24,
       itemStyle: { color: '#EE6666' },
     },
-    // {
-    //   name: '隐性误吸',
-    //   type: 'bar',
-    //   stack: 'total',
-    //   data: barData.map((d) => d.silent),
-    //   barMaxWidth: 24,
-    //   itemStyle: { color: '#FAC858' },
-    // },
   ],
-  // 堆叠时这两个间距不再重要，但保留也无妨
   barCategoryGap: '30%',
   barGap: '20%',
-}
-const pieOption = {
+}))
+
+const pieOption = computed(() => ({
   tooltip: { trigger: 'item' },
   series: [
     {
       name: '各科室吞咽障碍人群占比',
       type: 'pie',
-      radius: [25, '75%'],
+      radius: '75%',
       center: ['50%', '50%'],
-      roseType: 'radius',
-      data: pieData,
+      data: pieData.value,
       label: {
         formatter: '{b}\n{c} ({d}%)',
         fontSize: 12,
@@ -191,27 +223,17 @@ const pieOption = {
       },
     },
   ],
-}
+}))
 
-// —— 假数据：设备列表与近 7 天（与折线图同源的 7 个横轴刻度）——
-const deviceIds = ['DEV-001', 'DEV-002', 'DEV-003', 'DEV-004']
-const days = lineData.map((d) => d.category) // ['周日','周一',...,'周六']
+// 设备使用数据处理
+const deviceIds = computed(() => deviceUsageData.value.map((d) => d.deviceId))
+const days = computed(() => lineData.value.map((d) => d.category))
 
-// 每台设备 7 天的使用时长（小时）
-const deviceUsage: Record<string, number[]> = {
-  'DEV-001': [3.5, 4, 5, 4.5, 6, 5.5, 4.2],
-  'DEV-002': [2, 2.5, 3, 3.2, 3.8, 3.5, 2.8],
-  'DEV-003': [1.5, 2, 2.2, 2.8, 3, 2.5, 2],
-  'DEV-004': [0.8, 1, 1.2, 1.5, 1.6, 1.4, 1.1],
-}
-
-// 为不同设备准备一组柔和但可区分的配色（可按需调整）
+// 为不同设备准备一组柔和但可区分的配色
 const DEVICE_COLORS = ['#60A5FA', '#34D399', '#A78BFA', '#F472B6']
 
-// —— 河流图（堆叠面积流式效果）——
-const riverOption = {
+const riverOption = computed(() => ({
   grid: { top: 8, bottom: 40, containLabel: true },
-
   tooltip: {
     trigger: 'axis',
     axisPointer: { type: 'line' },
@@ -228,13 +250,10 @@ const riverOption = {
     },
     confine: true,
   },
-
-  // ↓ 图例放在底部，并且如果设备多可用 scroll 避免挤压
   legend: { bottom: 0 },
-
   xAxis: {
     type: 'category',
-    data: days,
+    data: days.value,
     boundaryGap: false,
     axisTick: { alignWithLabel: true },
   },
@@ -248,9 +267,8 @@ const riverOption = {
     axisTick: { show: true },
     splitLine: { show: true },
   },
-
-  series: deviceIds.map((devId, i) => ({
-    name: devId,
+  series: deviceUsageData.value.map((device, i) => ({
+    name: device.deviceId,
     type: 'line',
     stack: 'usage',
     smooth: true,
@@ -259,10 +277,10 @@ const riverOption = {
     lineStyle: { width: 0.5, opacity: 0.6 },
     itemStyle: { color: DEVICE_COLORS[i % DEVICE_COLORS.length] },
     emphasis: { focus: 'series' },
-    data: deviceUsage[devId],
+    data: device.usageHours,
     z: 1,
   })),
-}
+}))
 </script>
 
 <style scoped>

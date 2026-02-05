@@ -8,6 +8,11 @@ export interface PatientRow {
   dept: string | null
   address: string | null
   checked: boolean
+  idCard: string | null
+  onsetDate: string | null
+  pastHistory: string | null
+  bedNumber: string | null
+  course: string | null
 }
 
 export interface PageWrap<T> {
