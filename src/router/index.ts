@@ -21,11 +21,11 @@ const routes = [
         name: 'DashboardPatient',
         component: () => import('@/views/Patient.vue'),
       },
-      // {
-      //   path: 'model',
-      //   name: 'DashboardModel',
-      //   component: () => import('@/views/Model.vue'),
-      // },
+      {
+        path: 'model',
+        name: 'DashboardModel',
+        component: () => import('@/views/Model.vue'),
+      },
       {
         path: 'monitor',
         name: 'DashboardMonitor',
@@ -36,16 +36,16 @@ const routes = [
         name: 'DashboardData',
         component: () => import('@/views/Data.vue'),
       },
-      // {
-      //   path: 'department',
-      //   name: 'DashboardDepartment',
-      //   component: () => import('@/views/Department.vue'),
-      // },
-      // {
-      //   path: 'system',
-      //   name: 'DashboardSystem',
-      //   component: () => import('@/views/System.vue'),
-      // },
+      {
+        path: 'department',
+        name: 'DashboardDepartment',
+        component: () => import('@/views/Department.vue'),
+      },
+      {
+        path: 'system',
+        name: 'DashboardSystem',
+        component: () => import('@/views/System.vue'),
+      },
       {
         path: 'stats',
         name: 'DashboardStats',

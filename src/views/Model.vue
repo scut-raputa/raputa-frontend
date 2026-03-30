@@ -5,34 +5,30 @@
       <el-card shadow="hover" class="stat-card">
         <div class="stat-body">
           <div class="stat-left">
-            <el-statistic :value="20">
+            <el-statistic :value="stats.totalCount">
               <template #title>
                 <div class="stat-title">
                   模型总数
-                  <el-tooltip
-                    effect="dark"
-                    content="当前系统模型总数"
-                    placement="top"
-                  >
+                  <el-tooltip effect="dark" content="当前系统模型总数" placement="top">
                     <el-icon :size="12" class="stat-icon"><Warning /></el-icon>
                   </el-tooltip>
                 </div>
               </template>
             </el-statistic>
-            <div class="stat-note primary">投入使用模型数: 2</div>
+            <div class="stat-note primary">本周新增: {{ stats.weekNewCount }}</div>
           </div>
 
           <div class="stat-right">
             <el-progress
               type="dashboard"
-              :percentage="67"
+              :percentage="card1Percentage"
               :stroke-width="8"
               color="#409EFF"
               :width="120"
             >
               <template #default>
-                <span class="circle-number">2</span>
-                <span class="circle-label">已部署模型数</span>
+                <span class="circle-number">{{ stats.weekNewCount }}</span>
+                <span class="circle-label">本周新增</span>
               </template>
             </el-progress>
           </div>
@@ -43,34 +39,34 @@
       <el-card shadow="hover" class="stat-card">
         <div class="stat-body">
           <div class="stat-left">
-            <el-statistic :value="2">
+            <el-statistic :value="stats.weekNewCount">
               <template #title>
                 <div class="stat-title">
                   本周新增
-                  <el-tooltip
-                    effect="dark"
-                    content="本周上传的新模型数量"
-                    placement="top"
-                  >
+                  <el-tooltip effect="dark" content="本周上传的新模型数量" placement="top">
                     <el-icon :size="12" class="stat-icon"><Warning /></el-icon>
                   </el-tooltip>
                 </div>
               </template>
             </el-statistic>
-            <div class="stat-note success">本周新增模型部署数: 2</div>
+            <div :class="['stat-note', weekGrowth >= 0 ? 'success' : 'danger']">
+              {{ weekGrowth >= 0 ? '较上周增加' : '较上周减少' }}{{ Math.abs(weekGrowth) }}%
+            </div>
           </div>
 
           <div class="stat-right">
             <el-progress
               type="dashboard"
-              :percentage="60"
+              :percentage="Math.min(100, Math.abs(weekGrowth))"
               :stroke-width="8"
-              color="#67C23A"
+              :color="weekGrowth >= 0 ? '#67C23A' : '#F56C6C'"
               :width="120"
             >
               <template #default>
-                <span class="circle-number">60%</span>
-                <span class="circle-label">较上周新增上升</span>
+                <span class="circle-number" :style="{ color: weekGrowth >= 0 ? '#67C23A' : '#F56C6C' }">
+                  {{ weekGrowth >= 0 ? '+' : '' }}{{ weekGrowth }}%
+                </span>
+                <span class="circle-label">较上周</span>
               </template>
             </el-progress>
           </div>
@@ -83,28 +79,24 @@
           <div class="stat-left">
             <div class="stat-title">
               最活跃上传者
-              <el-tooltip
-                effect="dark"
-                content="本周上传模型最多的用户"
-                placement="top"
-              >
+              <el-tooltip effect="dark" content="上传模型最多的用户" placement="top">
                 <el-icon :size="12" class="stat-icon"><Warning /></el-icon>
               </el-tooltip>
             </div>
-            <div class="stat-value">张海文</div>
-            <div class="stat-note warning">上传模型总数: 5</div>
+            <div class="stat-value">{{ stats.topUploader ?? '暂无' }}</div>
+            <div class="stat-note warning">上传模型总数: {{ stats.topUploaderCount }}</div>
           </div>
 
           <div class="stat-right">
             <el-progress
               type="dashboard"
-              :percentage="50"
+              :percentage="Math.round(stats.topUploaderRatio * 100)"
               :stroke-width="8"
               color="#e6a23c"
               :width="120"
             >
               <template #default>
-                <span class="circle-number">25%</span>
+                <span class="circle-number">{{ Math.round(stats.topUploaderRatio * 100) }}%</span>
                 <span class="circle-label">贡献占比</span>
               </template>
             </el-progress>
@@ -126,9 +118,7 @@
             size="small"
             style="max-width: 200px"
           >
-            <template #prefix
-              ><el-icon><Search /></el-icon
-            ></template>
+            <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
 
           <el-input
@@ -138,9 +128,7 @@
             size="small"
             style="max-width: 200px"
           >
-            <template #prefix
-              ><el-icon><Search /></el-icon
-            ></template>
+            <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
 
           <el-input
@@ -150,9 +138,7 @@
             size="small"
             style="max-width: 200px"
           >
-            <template #prefix
-              ><el-icon><Search /></el-icon
-            ></template>
+            <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
 
           <el-input
@@ -162,9 +148,7 @@
             size="small"
             style="max-width: 200px"
           >
-            <template #prefix
-              ><el-icon><Search /></el-icon
-            ></template>
+            <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
 
           <el-date-picker
@@ -177,21 +161,10 @@
             style="max-width: 200px"
           />
 
-          <el-upload
-            ref="upload"
-            class="upload-button"
-            :limit="1"
-            :auto-upload="true"
-            :on-exceed="handleExceed"
-            :on-success="handleSuccess"
-            action="https://run.mocky.io/v3/9d059bf9-4660-45f2-925d-ce80ad6c4d15"
-            :show-file-list="false"
-          >
-            <el-button type="primary" size="small">
-              <el-icon class="icon-with-margin"><UploadFilled /></el-icon>
-              上传模型
-            </el-button>
-          </el-upload>
+          <el-button type="primary" size="small" @click="openCreateDialog">
+            <el-icon class="icon-with-margin"><Plus /></el-icon>
+            新增模型
+          </el-button>
         </div>
 
         <el-table
@@ -277,15 +250,8 @@
           <el-table-column label="操作" width="160">
             <template #default="{ row }">
               <template v-if="!row.__filler">
-                <el-button size="small" @click="() => onEdit(row)"
-                  >编辑</el-button
-                >
-                <el-button
-                  type="danger"
-                  size="small"
-                  @click="() => onDelete(row)"
-                  >删除</el-button
-                >
+                <el-button size="small" @click="() => onEdit(row)">编辑</el-button>
+                <el-button type="danger" size="small" @click="() => onDelete(row)">删除</el-button>
               </template>
             </template>
           </el-table-column>
@@ -304,6 +270,84 @@
         </div>
       </el-card>
     </div>
+
+    <!-- 新增 / 编辑 对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogMode === 'create' ? '新增模型' : '编辑模型'"
+      width="580px"
+      :close-on-click-modal="false"
+      @closed="resetForm"
+    >
+      <el-form ref="formRef" :model="form" :rules="formRules" label-width="90px" size="small">
+        <el-form-item label="模型功能" prop="func">
+          <el-input v-model="form.func" placeholder="如：吞咽分割" />
+        </el-form-item>
+        <el-form-item label="模型名称" prop="name">
+          <el-input v-model="form.name" placeholder="如：SwallowSegmentation_v1.6" />
+        </el-form-item>
+        <el-form-item label="上传时间" prop="uploadTime">
+          <el-date-picker
+            v-model="formUploadTime"
+            type="datetime"
+            placeholder="选择上传时间"
+            style="width: 100%"
+            :disabled-date="disabledFuture"
+          />
+        </el-form-item>
+        <el-form-item label="上传者" prop="uploader">
+          <el-input v-model="form.uploader" />
+        </el-form-item>
+        <el-form-item label="文件位置" prop="location">
+          <el-input v-model="form.location" placeholder="模型文件路径" />
+        </el-form-item>
+        <el-form-item label="备注信息">
+          <el-input v-model="form.remark" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-row :gutter="12">
+          <el-col :span="8">
+            <el-form-item label="准确率%">
+              <el-input-number
+                v-model="form.accuracy"
+                :min="0"
+                :max="100"
+                :precision="2"
+                :step="1"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="敏感度%">
+              <el-input-number
+                v-model="form.sensitivity"
+                :min="0"
+                :max="100"
+                :precision="2"
+                :step="1"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="特异度%">
+              <el-input-number
+                v-model="form.specificity"
+                :min="0"
+                :max="100"
+                :precision="2"
+                :step="1"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="submitForm">确认</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -319,19 +363,14 @@ import {
   nextTick,
   onBeforeUnmount,
 } from 'vue'
-import { ElMessageBox, ElMessage, genFileId } from 'element-plus'
-// import { useTransition } from '@vueuse/core'
-import {
-  Search,
-  Warning,
-  UploadFilled,
-  InfoFilled,
-} from '@element-plus/icons-vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
+import { Search, Warning, InfoFilled, Plus } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { listModels } from '@/api/model'
-import type { ModelRow } from '@/types/model'
-import type { UploadInstance, UploadProps, UploadRawFile } from 'element-plus'
+import { listModels, getModelStats, createModel, updateModel, deleteModel } from '@/api/model'
+import type { ModelRow, ModelStats } from '@/types/model'
+import type { FormInstance } from 'element-plus'
 
+// ─── Search / pagination ───────────────────────────────────────────────────
 const searchId = ref('')
 const searchFunction = ref('')
 const searchName = ref('')
@@ -340,26 +379,171 @@ const searchUploader = ref('')
 const page = ref(1)
 const pageSize = 8
 
+// ─── Table state ───────────────────────────────────────────────────────────
 const modelLoading = ref(false)
 const modelTotal = ref(0)
 const modelData = ref<ModelRow[]>([])
 const metricsVisible = reactive<Record<string, boolean>>({})
 
+// ─── Stats state ───────────────────────────────────────────────────────────
+const stats = reactive<ModelStats>({
+  totalCount: 0,
+  weekNewCount: 0,
+  lastWeekNewCount: 0,
+  topUploader: null,
+  topUploaderCount: 0,
+  topUploaderRatio: 0,
+})
+
+const card1Percentage = computed(() => {
+  if (stats.totalCount === 0) return 0
+  return Math.min(100, Math.round((stats.weekNewCount / stats.totalCount) * 100))
+})
+
+const weekGrowth = computed(() => {
+  if (stats.lastWeekNewCount === 0) {
+    return stats.weekNewCount > 0 ? 100 : 0
+  }
+  return Math.round(((stats.weekNewCount - stats.lastWeekNewCount) / stats.lastWeekNewCount) * 100)
+})
+
+// ─── Dialog state ──────────────────────────────────────────────────────────
+const dialogVisible = ref(false)
+const dialogMode = ref<'create' | 'edit'>('create')
+const editingId = ref('')
+const submitLoading = ref(false)
+const formRef = ref<FormInstance>()
+const formUploadTime = ref<Date | null>(null)
+
+const form = reactive({
+  func: '',
+  name: '',
+  uploadTime: '',
+  uploader: '',
+  remark: '',
+  location: '',
+  accuracy: null as number | null,
+  sensitivity: null as number | null,
+  specificity: null as number | null,
+})
+
+const formRules = {
+  func: [{ required: true, message: '请输入模型功能', trigger: 'blur' }],
+  name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
+  uploader: [{ required: true, message: '请输入上传者', trigger: 'blur' }],
+  location: [{ required: true, message: '请输入文件位置', trigger: 'blur' }],
+}
+
+function resetForm() {
+  form.func = ''
+  form.name = ''
+  form.uploader = ''
+  form.remark = ''
+  form.location = ''
+  form.accuracy = null
+  form.sensitivity = null
+  form.specificity = null
+  formUploadTime.value = null
+  formRef.value?.clearValidate()
+}
+
+function openCreateDialog() {
+  resetForm()
+  formUploadTime.value = new Date()
+  dialogMode.value = 'create'
+  dialogVisible.value = true
+}
+
+function onEdit(row: any) {
+  resetForm()
+  form.func = row.func ?? ''
+  form.name = row.name ?? ''
+  form.uploader = row.uploader ?? ''
+  form.remark = row.remark ?? ''
+  form.location = ''
+  form.accuracy = row.accuracy != null ? parseFloat((row.accuracy * 100).toFixed(2)) : null
+  form.sensitivity = row.sensitivity != null ? parseFloat((row.sensitivity * 100).toFixed(2)) : null
+  form.specificity = row.specificity != null ? parseFloat((row.specificity * 100).toFixed(2)) : null
+  // parse uploadTime string to Date for the picker
+  if (row.uploadTime) {
+    const s = row.uploadTime.replace('T', ' ').replace('Z', '')
+    formUploadTime.value = new Date(s)
+  } else {
+    formUploadTime.value = new Date()
+  }
+  editingId.value = row.id
+  dialogMode.value = 'edit'
+  dialogVisible.value = true
+}
+
+function toIsoLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+async function submitForm() {
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
+  const dto = {
+    func: form.func,
+    name: form.name,
+    uploadTime: formUploadTime.value ? toIsoLocal(formUploadTime.value) : toIsoLocal(new Date()),
+    uploader: form.uploader,
+    remark: form.remark,
+    location: form.location,
+    accuracy:
+      form.accuracy != null
+        ? parseFloat((form.accuracy / 100).toFixed(4))
+        : null,
+    sensitivity:
+      form.sensitivity != null
+        ? parseFloat((form.sensitivity / 100).toFixed(4))
+        : null,
+    specificity:
+      form.specificity != null
+        ? parseFloat((form.specificity / 100).toFixed(4))
+        : null,
+  }
+  submitLoading.value = true
+  try {
+    if (dialogMode.value === 'create') {
+      await createModel(dto as any)
+      ElMessage.success('新增成功')
+    } else {
+      await updateModel(editingId.value, dto as any)
+      ElMessage.success('编辑成功')
+    }
+    dialogVisible.value = false
+    fetchModels()
+    fetchStats()
+  } catch (e: any) {
+    ElMessage.error(e?.message ?? '操作失败')
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+async function onDelete(row: any) {
+  try {
+    await ElMessageBox.confirm(`确认删除【${row.name}】？`, '删除确认', {
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteModel(row.id)
+    ElMessage.success('删除成功')
+    fetchModels()
+    fetchStats()
+  } catch (e: any) {
+    ElMessage.error(e?.message ?? '删除失败')
+  }
+}
+
+// ─── Data fetching ─────────────────────────────────────────────────────────
 function formatLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-const upload = ref<UploadInstance>()
-
-const handleExceed: UploadProps['onExceed'] = (files) => {
-  upload.value?.clearFiles()
-  const file = files[0] as UploadRawFile
-  file.uid = genFileId()
-  upload.value?.handleStart(file)
-}
-
-const handleSuccess: UploadProps['onSuccess'] = () => {
-  ElMessage.success('上传成功')
 }
 
 async function fetchModels() {
@@ -382,7 +566,19 @@ async function fetchModels() {
   }
 }
 
-onMounted(fetchModels)
+async function fetchStats() {
+  try {
+    const data = await getModelStats()
+    Object.assign(stats, data)
+  } catch {
+    // silently ignore stats fetch errors
+  }
+}
+
+onMounted(() => {
+  fetchModels()
+  fetchStats()
+})
 watch(page, () => fetchModels())
 watch(
   [searchId, searchFunction, searchName, searchUploader, searchTime],
@@ -392,10 +588,9 @@ watch(
   },
 )
 
-const paginatedModels = computed(() => modelData.value)
-
+// ─── Table helpers ─────────────────────────────────────────────────────────
 const modelRows = computed(() => {
-  const rows = paginatedModels.value as any[]
+  const rows = modelData.value as any[]
   const pad = pageSize - rows.length
   if (pad <= 0) return rows
   const fillers = Array.from({ length: pad }, (_, i) => ({
@@ -404,17 +599,57 @@ const modelRows = computed(() => {
   }))
   return rows.concat(fillers as any)
 })
+
 function modelRowClassName({ row }: { row: any }) {
   return row.__filler ? 'is-filler' : ''
 }
 
+function formatDateTime(input?: string | Date | null): string {
+  if (!input) return '-'
+  if (typeof input === 'string') {
+    const s = input.replace('T', ' ').replace('Z', '')
+    return s.slice(0, 16)
+  }
+  const d = new Date(input)
+  if (Number.isNaN(d.getTime())) return String(input)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const y = d.getFullYear()
+  const m = pad(d.getMonth() + 1)
+  const day = pad(d.getDate())
+  const hh = pad(d.getHours())
+  const mm = pad(d.getMinutes())
+  return `${y}-${m}-${day} ${hh}:${mm}`
+}
+
+function uploadTimeFormatter(_row: any, _col: any, cellValue: any) {
+  return formatDateTime(cellValue)
+}
+
+function disabledFuture(date: Date) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date.getTime() > today.getTime()
+}
+
+function row35Style() {
+  return { height: '35px' }
+}
+function cell35Style() {
+  return {
+    paddingTop: '0px',
+    paddingBottom: '0px',
+    height: '35px',
+    lineHeight: '35px',
+  }
+}
+
+// ─── Radar chart mini component ────────────────────────────────────────────
 const RadarMini = defineComponent({
   name: 'RadarMini',
   props: {
     accuracy: { type: Number, default: null },
     sensitivity: { type: Number, default: null },
     specificity: { type: Number, default: null },
-    // 新增：由 Popover 传入
     visible: { type: Boolean, default: false },
   },
   setup(props) {
@@ -428,7 +663,6 @@ const RadarMini = defineComponent({
     const ensureInited = () => {
       if (!elRef.value) return false
       const { clientWidth, clientHeight } = elRef.value
-      // Popover 未展开时这里为 0，直接跳过
       if (!clientWidth || !clientHeight) return false
       if (!chart) chart = echarts.init(elRef.value)
       return true
@@ -479,8 +713,6 @@ const RadarMini = defineComponent({
 
     onMounted(async () => {
       await nextTick()
-
-      // 观察尺寸变化：Popover 打开定位/动画后重新渲染
       if (elRef.value && 'ResizeObserver' in window) {
         ro = new ResizeObserver(() => {
           if (!props.visible) return
@@ -488,28 +720,20 @@ const RadarMini = defineComponent({
         })
         ro.observe(elRef.value)
       }
-
-      // 若进场时就可见，延迟一次渲染（等待 Popover 完全展开）
       if (props.visible) {
         setTimeout(render, 60)
       }
     })
 
-    // Popover 显隐
     watch(
       () => props.visible,
       (v) => {
         if (v) {
-          // 等下一帧和一次微延迟，确保 popper 完全挂载并有尺寸
           nextTick(() => setTimeout(render, 60))
-        } else {
-          // 可选：隐藏时不做销毁，避免下次打开重新 init 造成闪烁
-          // 需要彻底销毁可在这里 chart?.dispose()
         }
       },
     )
 
-    // 指标变动也触发一次渲染
     watch(
       () => [props.accuracy, props.sensitivity, props.specificity],
       () => render(),
@@ -524,54 +748,6 @@ const RadarMini = defineComponent({
     return () => h('div', { ref: elRef, class: 'radar-mini' })
   },
 })
-
-function disabledFuture(date: Date) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return date.getTime() > today.getTime()
-}
-
-function onEdit(row: any) {
-  ElMessage.info(`编辑 ${row.name}`)
-}
-function onDelete(row: any) {
-  ElMessageBox.confirm(`确认删除【${row.name}】？`, '删除确认', {
-    type: 'warning',
-  }).then(() => ElMessage.success('已删除（模拟）'))
-}
-
-function formatDateTime(input?: string | Date | null): string {
-  if (!input) return '-'
-  if (typeof input === 'string') {
-    const s = input.replace('T', ' ').replace('Z', '')
-    return s.slice(0, 16)
-  }
-  const d = new Date(input)
-  if (Number.isNaN(d.getTime())) return String(input)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const y = d.getFullYear()
-  const m = pad(d.getMonth() + 1)
-  const day = pad(d.getDate())
-  const hh = pad(d.getHours())
-  const mm = pad(d.getMinutes())
-  return `${y}-${m}-${day} ${hh}:${mm}`
-}
-
-function uploadTimeFormatter(_row: any, _col: any, cellValue: any) {
-  return formatDateTime(cellValue)
-}
-
-function row35Style() {
-  return { height: '35px' }
-}
-function cell35Style() {
-  return {
-    paddingTop: '0px',
-    paddingBottom: '0px',
-    height: '35px',
-    lineHeight: '35px',
-  }
-}
 </script>
 
 <style scoped>
@@ -623,29 +799,6 @@ function cell35Style() {
   font-size: 24px;
   font-weight: bold;
 }
-.stat-footer {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-:deep(.stat-footer .el-progress__text) {
-  text-align: right;
-}
-.green {
-  color: var(--el-color-success);
-}
-.red {
-  color: var(--el-color-error);
-}
-.suffix-text {
-  margin-left: 4px;
-  font-size: 14px;
-  font-weight: 500;
-}
-.suffix-text.success {
-  color: var(--el-color-success);
-}
 .stat-body {
   display: flex;
   align-items: center;
@@ -669,6 +822,9 @@ function cell35Style() {
 .stat-note.warning {
   color: var(--el-color-warning);
 }
+.stat-note.danger {
+  color: var(--el-color-danger);
+}
 .circle-number {
   display: block;
   font-size: 24px;
@@ -682,8 +838,6 @@ function cell35Style() {
   text-align: center;
   margin-top: 4px;
 }
-
-/* —— 控制行：与患者页一致的样式（保持逻辑不变） —— */
 .filter-row {
   display: flex;
   justify-content: space-between;
@@ -694,8 +848,6 @@ function cell35Style() {
 .icon-with-margin {
   margin-right: 4px;
 }
-
-/* —— 表格与分页：与患者页一致 —— */
 .model-table {
   width: 100%;
 }
@@ -703,12 +855,10 @@ function cell35Style() {
   display: flex;
   justify-content: center;
 }
-
 .metrics-icon {
   cursor: pointer;
   color: var(--el-color-info);
 }
-
 :deep(.el-popover.radar-popover) {
   background: #fff;
   border: none;
@@ -719,16 +869,12 @@ function cell35Style() {
     0 2px 8px rgba(0, 0, 0, 0.3);
   max-width: 520px;
 }
-
-/* 标题加大加粗 */
 .radar-title {
   font-size: 16px;
   font-weight: 700;
   color: #303133;
   margin-bottom: 10px;
 }
-
-/* 内容行：雷达图 + 文本 */
 .radar-popover-body {
   display: flex;
   align-items: center;
@@ -736,13 +882,10 @@ function cell35Style() {
   gap: 16px;
   min-height: 240px;
 }
-
-/* 你已有的雷达图容器尺寸可继续复用 */
 .radar-mini {
   width: 240px;
   height: 240px;
 }
-
 .radar-vals {
   list-style: none;
   margin: 0;
@@ -752,8 +895,6 @@ function cell35Style() {
   line-height: 1.8;
   min-width: 90px;
 }
-
-/* 占位空行隐藏内容（与患者页一致） */
 :deep(.el-table__body tr.is-filler .cell) {
   visibility: hidden;
   pointer-events: none;
