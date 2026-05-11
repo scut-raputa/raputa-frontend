@@ -57,16 +57,37 @@
               </template>
             </template>
           </el-table-column>
+          <el-table-column label="会话占用" min-width="180">
+            <template #default="{ row }">
+              <template v-if="!row.__filler">
+                <el-tag v-if="row.occupied" type="warning" effect="light" size="small">
+                  占用中
+                </el-tag>
+                <span v-else class="muted">空闲</span>
+                <div v-if="row.occupied" class="occupied-detail">
+                  {{ row.occupiedPatientName || '-' }}（{{ row.occupiedPatientId || '-' }}）
+                </div>
+              </template>
+            </template>
+          </el-table-column>
           <el-table-column prop="description" label="设备描述" min-width="200" show-overflow-tooltip />
           <el-table-column prop="storageLocation" label="设备保管地点" min-width="130" />
           <el-table-column prop="responsible" label="负责人" min-width="90" />
-          <el-table-column label="操作" width="220">
+          <el-table-column label="操作" width="290">
             <template #default="{ row }">
               <template v-if="!row.__filler">
                 <el-button size="small" :type="row.status === '在线' ? 'primary' : 'default'"
                   :plain="row.status !== '在线'" :loading="togglingId === row.id"
                   @click="onToggleConnect(row)">
                   {{ row.status === '在线' ? '断连' : '连接' }}
+                </el-button>
+                <el-button
+                  v-if="row.occupied"
+                  size="small"
+                  type="warning"
+                  @click="onForceRelease(row)"
+                >
+                  强制释放
                 </el-button>
                 <el-button size="small" @click="openDeviceEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" @click="onDeleteDevice(row)">删除</el-button>
@@ -213,7 +234,7 @@ import { Search, Plus, Link, Location, Filter } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import type { DeviceRow, DoctorRow } from '@/types/department'
 import {
-  listDevices, getDeviceLocations, createDevice, updateDevice, deleteDevice, toggleDeviceStatus,
+  listDevices, getDeviceLocations, createDevice, updateDevice, deleteDevice, toggleDeviceStatus, forceReleaseDeviceLock,
   listDoctors, createDoctor, updateDoctor, deleteDoctor,
 } from '@/api/department'
 
@@ -301,6 +322,22 @@ async function onToggleConnect(row: DeviceRow) {
     ElMessage.error(e?.message ?? '操作失败')
   } finally {
     togglingId.value = null
+  }
+}
+
+async function onForceRelease(row: DeviceRow) {
+  try {
+    await ElMessageBox.confirm(`确认强制释放设备【${row.name}】当前占用会话？`, '强制释放确认', { type: 'warning' })
+  } catch {
+    return
+  }
+
+  try {
+    await forceReleaseDeviceLock(row.id)
+    ElMessage.success('设备占用已强制释放')
+    fetchDevices()
+  } catch (e: any) {
+    ElMessage.error(e?.message ?? '强制释放失败')
   }
 }
 
@@ -527,6 +564,14 @@ async function submitDoctor() {
 }
 .icon-with-margin {
   margin-right: 4px;
+}
+.muted {
+  color: #909399;
+}
+.occupied-detail {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #e6a23c;
 }
 :deep(.el-table__body tr.is-filler .cell) {
   visibility: hidden;

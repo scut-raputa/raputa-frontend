@@ -3,10 +3,20 @@ export type DeviceRow = {
     name: string
     ip: string | null
     lastConnectedTime: string | null
+  lastSeenAt: string | null
     status: '在线' | '离线'
+  accessMode: 'DISCOVERY' | 'STATIC' | 'MANUAL'
+  controlPort: number | null
+  rtspPath: string | null
+  enabled: boolean
     description: string | null
     storageLocation: string | null
     responsible: string | null
+  occupied: boolean
+  occupiedSessionId: string | null
+  occupiedPatientId: string | null
+  occupiedPatientName: string | null
+  lockExpiresAt: string | null
   }
   
   export type DeviceQueryParams = {
@@ -24,6 +34,10 @@ export type DeviceRow = {
     ip: string
     lastConnectedTime: string | null
     status: string
+    accessMode?: 'DISCOVERY' | 'STATIC' | 'MANUAL'
+    controlPort?: number
+    rtspPath?: string
+    enabled?: boolean
     description: string
     storageLocation: string
     responsible: string

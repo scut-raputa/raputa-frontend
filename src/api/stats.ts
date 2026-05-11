@@ -1,5 +1,4 @@
 import request from '@/utils/request'
-import type { ApiResponse } from '@/types/response'
 
 
 export interface DailyPatientCount {
@@ -40,17 +39,11 @@ export interface StatsQuery {
 }
 
 export function getStats(params?: StatsQuery) {
-  return request<ApiResponse<StatsResponse>>({
-    url: '/api/stats',
-    method: 'get',
-    params,
-  })
+  return request.get<StatsResponse>('/api/stats', { params }).then((res) => res.data)
 }
 
 export function getDailyPatientCount(params?: StatsQuery) {
-  return request<ApiResponse<StatsResponse>>({
-    url: '/api/stats/daily-patient-count',
-    method: 'get',
-    params,
-  })
+  return request
+    .get<StatsResponse>('/api/stats/daily-patient-count', { params })
+    .then((res) => res.data)
 }

@@ -8,6 +8,10 @@ function isPublic(path: string) {
   return PUBLIC_ROUTES.has(path)
 }
 
+function homePathForRole(role?: string) {
+  return role === 'ADMIN' ? '/dashboard/system' : '/dashboard/patient'
+}
+
 function bounceToLogin(router: Router, msg = '未登录或登录已失效') {
   clearToken()
   clearUser()
@@ -19,6 +23,10 @@ export function installRouterGuards(router: Router) {
   router.beforeEach((to, from, next) => {
     const token = getToken()
     const user = getUser()
+
+    if (token && user && isPublic(to.path)) {
+      return next({ path: homePathForRole(user.role), replace: true })
+    }
 
     if (!token) {
       if (isPublic(to.path)) return next()

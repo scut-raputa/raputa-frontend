@@ -213,7 +213,7 @@
                             size="small"
                             text
                             type="primary"
-                            @click="() => onDownload(patient.name, file.name, file.path)"
+                            @click="() => onDownload(file.name, file.id)"
                           >
                             下载
                           </el-button>
@@ -266,7 +266,7 @@ import {
 import axios from 'axios'
 
 // ---- 后端返回的数据结构 ----
-type FileItem = { name: string; type: string; path: string }
+type FileItem = { id: string; name: string; type: string }
 type TimeGroup = { time: string; files: FileItem[] }                // HH:mm:ss
 type DateGroup = { date: string; slots: TimeGroup[] }               // yyyy-MM-dd
 type PatientFiles = { id: string; name: string; dates: DateGroup[] }
@@ -467,14 +467,11 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-// 1) 单文件下载（用真实路径）
-// 调用处已经传入 patient.name, file.name，现在我们也有 file.path
-async function onDownload(user: string, fileName: string, filePath?: string) {
+// 1) 单文件下载（用 fileId）
+async function onDownload(fileName: string, fileId: string) {
   try {
-    // 如果调用时没有传 path（例如你的模板里还没改），可先不报错
-    const path = filePath ?? ''
     const { data } = await axios.get('/api/download/file', {
-      params: { path },
+      params: { fileId },
       responseType: 'blob',
     })
     saveBlob(data, fileName)

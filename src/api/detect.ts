@@ -1,4 +1,4 @@
-import axios from 'axios'
+import { postJson } from '@/utils/request'
 
 
 // 检测结果接口定义
@@ -21,6 +21,9 @@ export interface AspirationResult {
 }
 
 export interface DetectionResponse {
+  sessionId?: string
+  status?: string
+  swallowEvents?: number[][]
   swallow_events?: number[][]  // 吞咽事件时间段 [[start, end], ...]
   dysphagia?: DysphagiaResult[]  // 吞咽障碍检测结果
   aspiration?: AspirationResult[]  // 误吸检测结果
@@ -37,16 +40,20 @@ export interface DetectionResponse {
 export async function uploadAndPredict(
   audioFile: File,
   imuFile: File,
-  gasFile: File
+  gasFile: File,
+  patientId: string,
+  patientName: string
 ): Promise<DetectionResponse> {
   const formData = new FormData()
   formData.append('audio', audioFile)
   formData.append('imu', imuFile)
   formData.append('gas', gasFile)
+  formData.append('patientId', patientId)
+  formData.append('patientName', patientName || '')
 
   try {
-    const response = await axios.post<DetectionResponse>(
-      '/detect/upload_predict/',  // 使用代理路径
+    const response = await postJson<DetectionResponse>(
+      '/api/inference/file-detect',
       formData,
       {
         headers: {
@@ -55,6 +62,14 @@ export async function uploadAndPredict(
         timeout: 60000, // 60秒超时
       }
     )
+
+    const ok = response?.code === 0 || response?.code === 200
+    if (!ok) {
+      throw new Error(response?.message || '检测失败')
+    }
+    if (!response.data) {
+      throw new Error(response?.message || '检测结果为空')
+    }
     return response.data
   } catch (error: any) {
     console.error('检测请求失败:', error)

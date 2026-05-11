@@ -118,27 +118,22 @@ const loadStats = async () => {
   loading.value = true
   try {
     const days = 7
-    const response = await getStats({ days })
-    if (response.code === 0 && response.data) {
-      const data = response.data
-      
-      const dateLabels = generateDateLabels(days)
-      
-      lineData.value = (data.dailyPatientCount || []).map((item, index) => ({
-        ...item,
-        category: dateLabels[index] || item.category,
-      }))
-      
-      barData.value = (data.dailyCheckResult || []).map((item, index) => ({
-        ...item,
-        category: dateLabels[index] || item.category,
-      }))
-      
-      pieData.value = data.deptPatientCount || []
-      deviceUsageData.value = data.deviceUsage || []
-    } else {
-      ElMessage.error(response.message || '获取统计数据失败')
-    }
+    const data = await getStats({ days })
+
+    const dateLabels = generateDateLabels(days)
+
+    lineData.value = (data.dailyPatientCount || []).map((item, index) => ({
+      ...item,
+      category: dateLabels[index] || item.category,
+    }))
+
+    barData.value = (data.dailyCheckResult || []).map((item, index) => ({
+      ...item,
+      category: dateLabels[index] || item.category,
+    }))
+
+    pieData.value = data.deptPatientCount || []
+    deviceUsageData.value = data.deviceUsage || []
   } catch (error) {
     console.error('获取统计数据失败:', error)
     ElMessage.error('获取统计数据失败，请稍后重试')
@@ -251,7 +246,6 @@ const pieOption = computed(() => ({
   ],
 }))
 
-const deviceIds = computed(() => deviceUsageData.value.map((d) => d.deviceId))
 const days = computed(() => lineData.value.map((d) => d.category))
 
 const DEVICE_COLORS = ['#60A5FA', '#34D399', '#A78BFA', '#F472B6']

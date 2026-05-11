@@ -59,8 +59,8 @@
           :row-style="row35Style"
           :cell-style="cell35Style"
         >
-          <el-table-column prop="id" label="就诊编号" min-width="120" />
-          <el-table-column prop="name" label="患者姓名" min-width="80" />
+          <el-table-column prop="id" label="就诊编号" min-width="150" />
+          <el-table-column prop="name" label="患者姓名" min-width="70" />
           <el-table-column prop="dept" label="预约科室" min-width="80" />
           <el-table-column prop="time" label="预约时间" width="100" />
           <el-table-column label="操作" width="130">
@@ -127,6 +127,7 @@
                 v-model="createApptForm.time"
                 type="date"
                 placeholder="请选择预约时间"
+                :disabled-date="disabledPastDate"
                 style="width: 100%"
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
@@ -180,6 +181,7 @@
                 v-model="editApptForm.time"
                 type="date"
                 placeholder="请选择预约时间"
+                :disabled-date="disabledPastDate"
                 style="width: 100%"
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
@@ -420,7 +422,7 @@
               {{ row.dept ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="身份证" min-width="120">
+          <el-table-column label="身份证" min-width="140">
             <template #default="{ row }">
               {{ row.idCard ?? '-' }}
             </template>
@@ -442,7 +444,7 @@
               {{ row.onsetDate ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="既往史" min-width="150" show-overflow-tooltip>
+          <el-table-column label="既往史" min-width="100" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.pastHistory ?? '-' }}
             </template>
@@ -728,6 +730,7 @@ function todayLocal(): Date {
   return startOfDay(new Date())
 }
 
+const disabledPastDate = (time: Date) => time < todayLocal()
 
 const disabledDate = (time: Date) => {
   const today = todayLocal()
@@ -735,6 +738,61 @@ const disabledDate = (time: Date) => {
   twoWeeksEnd.setDate(today.getDate() + 14)
   return time < today || time > twoWeeksEnd
 }
+
+const validateApptDateFutureOrToday = (_rule: any, value: string, callback: (error?: Error) => void) => {
+  if (!value) {
+    callback(new Error('请选择预约时间'))
+    return
+  }
+  const todayStr = formatLocalDate(todayLocal())
+  if (value < todayStr) {
+    callback(new Error('预约时间必须为今天或之后'))
+    return
+  }
+  callback()
+}
+
+const MAINLAND_ID_REGEX = /^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[0-9Xx]$/
+const ID_CARD_WEIGHTS = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+const ID_CARD_CHECKSUM = '10X98765432'
+
+function isValidMainlandIdCard(idCard: string): boolean {
+  const id = idCard.trim().toUpperCase()
+  if (!MAINLAND_ID_REGEX.test(id)) return false
+
+  const year = Number(id.slice(6, 10))
+  const month = Number(id.slice(10, 12))
+  const day = Number(id.slice(12, 14))
+  const date = new Date(year, month - 1, day)
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() + 1 !== month ||
+    date.getDate() !== day
+  ) {
+    return false
+  }
+
+  let sum = 0
+  for (let i = 0; i < 17; i++) {
+    sum += Number(id[i]) * ID_CARD_WEIGHTS[i]
+  }
+  const expected = ID_CARD_CHECKSUM[sum % 11]
+  return id[17] === expected
+}
+
+const validateMainlandIdCard = (_rule: any, value: string, callback: (error?: Error) => void) => {
+  const id = String(value ?? '').trim()
+  if (!id) {
+    callback(new Error('请填写身份证号'))
+    return
+  }
+  if (!isValidMainlandIdCard(id)) {
+    callback(new Error('请输入有效的中国大陆居民身份证号'))
+    return
+  }
+  callback()
+}
+
 function onClearApptDate() {
   apptSelectedDate.value = null
   ElMessage.info('已清除日期，默认展示今日预约情况')
@@ -798,7 +856,7 @@ const createApptForm = reactive({
 const createApptRules: FormRules = {
   name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
   dept: [{ required: true, message: '请填写科室', trigger: 'blur' }],
-  time: [{ required: true, message: '请选择预约时间', trigger: 'change' }],
+  time: [{ validator: validateApptDateFutureOrToday, trigger: 'change' }],
 }
 
 const validateApptFieldSilently = (
@@ -881,7 +939,7 @@ const editApptForm = reactive({
 const editApptRules: FormRules = {
   name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
   dept: [{ required: true, message: '请填写科室', trigger: 'blur' }],
-  time: [{ required: true, message: '请选择预约时间', trigger: 'change' }],
+  time: [{ validator: validateApptDateFutureOrToday, trigger: 'change' }],
 }
 
 const validateEditApptFieldSilently = (
@@ -1171,7 +1229,7 @@ const createRules: FormRules = {
   name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
   gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
   dept: [{ required: true, message: '请填写科室', trigger: 'blur' }],
-  idCard: [{ required: true, message: '请填写身份证号', trigger: 'blur' }],
+  idCard: [{ validator: validateMainlandIdCard, trigger: 'blur' }],
   onsetDate: [{ required: true, message: '请选择发病日期', trigger: 'change' }],
   pastHistory: [{ required: true, message: '请填写既往史', trigger: 'blur' }],
   bedNumber: [{ required: true, message: '请填写病床号', trigger: 'blur' }],
@@ -1291,7 +1349,7 @@ const editRules: FormRules = {
   name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
   gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
   dept: [{ required: true, message: '请填写科室', trigger: 'blur' }],
-  idCard: [{ required: true, message: '请填写身份证号', trigger: 'blur' }],
+  idCard: [{ validator: validateMainlandIdCard, trigger: 'blur' }],
   onsetDate: [{ required: true, message: '请选择发病日期', trigger: 'change' }],
   pastHistory: [{ required: true, message: '请填写既往史', trigger: 'blur' }],
   bedNumber: [{ required: true, message: '请填写病床号', trigger: 'blur' }],

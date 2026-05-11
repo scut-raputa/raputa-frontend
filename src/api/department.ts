@@ -36,6 +36,10 @@ export function toggleDeviceStatus(id: string) {
   return request.patch<DeviceRow>(`/api/device/${id}/status`).then((res) => res.data)
 }
 
+export function forceReleaseDeviceLock(id: string) {
+  return request.post<boolean>(`/api/device/${id}/force-release`).then((res) => res.data)
+}
+
 // ─── Doctor ───────────────────────────────────────────────────────────────
 export function listDoctors(params: DoctorQueryParams) {
   return request

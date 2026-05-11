@@ -8,6 +8,7 @@
         :rules="rules"
         class="register-form"
         label-width="0"
+        @keyup.enter.prevent="onSubmit"
       >
         <!-- 医院名 -->
         <el-form-item prop="hospitalName">

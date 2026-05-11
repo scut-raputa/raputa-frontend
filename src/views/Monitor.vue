@@ -155,7 +155,7 @@
           :options="loading ? [] : deviceOptions"
           :filterable="true"
           :remote="true"
-          :disabled="isFileMode"
+          :disabled="isFileMode || isDeviceSelectionFrozen"
           :filter-method="filterDevices"
           placeholder="请选择检测设备（实时模式）"
           clearable
@@ -228,6 +228,7 @@
               <el-button
                 size="small"
                 :type="item.status === 'online' ? 'danger' : 'success'"
+                :disabled="isDeviceSelectionFrozen"
                 @click.stop="toggleDeviceConnection(item)"
               >
                 {{ item.status === 'online' ? '断连' : '连接' }}
@@ -595,7 +596,10 @@ import type { UserVO } from '@/types/user'
 import { listPatients, getPatientById } from '@/api/patient'
 
 import { uploadReportPdf } from '@/api/report'
-import { finalizeRealtimeSession } from '@/api/realtime'
+import {
+  finalizeRealtimeSession,
+  type RealtimeConnectResult,
+} from '@/api/realtime'
 
 import axios from 'axios'
 
@@ -829,6 +833,7 @@ const wsConnected = ref(false)
 
 // 实时数据基准时间戳 - 用于计算相对时间
 let realtimeBaseTimestamp = 0
+let realtimeRenderCursorSec = 0
 
 // 图表 DOM ref
 const imuRef = ref<HTMLDivElement>()
@@ -862,8 +867,8 @@ let fileDetectTimer: number | null = null
 let swallowSegments: [number, number][] = [] // 存储吞咽时间段（用于遮罩）
 let aspirationSegments: [number, number][] = [] // 存储误吸时间段（用于红色遮罩）
 
-let audioDataBuffer: Float32Array = new Float32Array()
-const audioUrl = new URL('@/mock/signals/audio.wav', import.meta.url).href
+// let audioDataBuffer: Float32Array = new Float32Array()
+// const audioUrl = new URL('@/mock/signals/audio.wav', import.meta.url).href
 
 // 控制变量
 const selectedSegModel = ref('segA') // 默认选择第一个分割模型
@@ -874,6 +879,8 @@ const isDetecting = ref(false)
 const hasStopped = ref(false)
 const canReset = ref(false)
 const hasChartStarted = ref(false)
+const realtimeSessionId = ref('')
+const fileDetectSessionId = ref('')
 
 // 实时检测统计数据
 const realtimeStats = reactive({
@@ -901,6 +908,10 @@ const uploadedFiles = reactive({
 
 // 模式控制状态
 const isFileMode = ref(false) // true=文件模式，false=实时模式
+
+const isDeviceSelectionFrozen = computed(
+  () => !isFileMode.value && (isDetecting.value || !!realtimeSessionId.value)
+)
 
 // 服务器端临时文件
 const filePayloadReady = ref(false) // 映射完成后置 true 才能开始检测
@@ -959,6 +970,8 @@ type DeviceItem = {
   mac: string
   status: 'online' | 'offline'
   desc: string
+  name?: string
+  rtspPath?: string
 }
 const deviceList = ref<DeviceItem[]>([
   // {
@@ -1093,15 +1106,33 @@ async function handleDeviceDiscovery() {
       throw new Error('未收到设备数据')
     }
 
+    const normalizedIp = String(deviceData.deviceIp || '').trim()
+    if (!normalizedIp) {
+      throw new Error('设备IP为空，无法建立连接')
+    }
+
+    let parsedInfo: Record<string, any> = {}
+    try {
+      parsedInfo = deviceData.deviceInfo ? JSON.parse(deviceData.deviceInfo) : {}
+    } catch {
+      parsedInfo = {}
+    }
+
+    const fallbackId = `DIS-${normalizedIp.replace(/[^\dA-Za-z]/g, '').slice(-10)}`
+    const resolvedDeviceId = String(deviceData.deviceId || '').trim() || fallbackId
+    const resolvedDeviceName = String(deviceData.deviceName || '').trim() || resolvedDeviceId
+
     // 创建新的设备项
     const newDevice: DeviceItem = {
-      id: `树莓派-01`, // 生成唯一ID
-      ip: deviceData.deviceIp,
-      mac: JSON.parse(deviceData.deviceInfo).mac,
+      id: resolvedDeviceId,
+      ip: normalizedIp,
+      mac: String(parsedInfo.mac || '--'),
       status: deviceData.status === 'ONLINE' ? 'online' : 'offline',
       desc: `发现时间: ${new Date(
         deviceData.discoveryTime
       ).toLocaleTimeString()}`,
+      name: resolvedDeviceName,
+      rtspPath: deviceData.rtspPath,
     }
 
     // 检查是否已存在相同IP的设备
@@ -1110,7 +1141,13 @@ async function handleDeviceDiscovery() {
     )
     if (existingIndex >= 0) {
       // 更新现有设备
+      const previousId = deviceList.value[existingIndex].id
       deviceList.value[existingIndex] = newDevice
+      if (previousId !== newDevice.id) {
+        selectedDevice.value = selectedDevice.value.map((id) =>
+          id === previousId ? newDevice.id : id
+        )
+      }
       ElMessage.success(`设备 ${newDevice.ip} 状态已更新`)
     } else {
       // 添加新设备
@@ -1127,7 +1164,7 @@ async function handleDeviceDiscovery() {
 
 // 处理下拉框显示/隐藏事件
 function handleSelectVisibleChange(visible: boolean) {
-  if (visible && !isFileMode.value) {
+  if (visible && !isFileMode.value && !isDeviceSelectionFrozen.value) {
     // 当下拉框打开且不是文件模式时，触发设备发现
     handleDeviceDiscovery()
   }
@@ -1403,6 +1440,9 @@ async function downloadReport() {
       selectedPatientName.value ||
       reportData.value.name ||
       ''
+    const activeSessionId = isFileMode.value
+      ? fileDetectSessionId.value
+      : realtimeSessionId.value
 
     if (!pid) {
       ElNotification({
@@ -1411,15 +1451,23 @@ async function downloadReport() {
         type: 'warning',
       })
     } else {
-      uploadReportPdf(pid, pname, pdfBlob, filename).catch(e => {
+      if (!activeSessionId) {
         ElNotification({
           title: '报告登记失败',
-          message:
-            e?.message ||
-            'PDF 已下载，但未写入 PatientFile，请及时联系管理员补录。',
+          message: '当前检测会话缺失，PDF 已下载但无法登记到患者档案。',
           type: 'warning',
         })
-      })
+      } else {
+        uploadReportPdf(pid, pname, activeSessionId, pdfBlob, filename).catch(e => {
+          ElNotification({
+            title: '报告登记失败',
+            message:
+              e?.message ||
+              'PDF 已下载，但未写入 PatientFile，请及时联系管理员补录。',
+            type: 'warning',
+          })
+        })
+      }
     }
 
     // 5.2 真正触发浏览器下载
@@ -1427,9 +1475,13 @@ async function downloadReport() {
 
     // === 5.2.1 实时模式下：下载完成后，把本次会话文件从“临时”转“正式” ===
     // ★ 这里用你上面定义好的 currentDeviceId 和 isFileMode
-    if (!isFileMode.value && currentDeviceId.value) {
+    if (!isFileMode.value && (realtimeSessionId.value || currentDeviceId.value)) {
       try {
-        await finalizeRealtimeSession(currentDeviceId.value)
+        await finalizeRealtimeSession({
+          sessionId: realtimeSessionId.value || undefined,
+          deviceId: currentDeviceId.value || undefined,
+        })
+        realtimeSessionId.value = ''
       } catch (e: any) {
         ElNotification({
           title: '会话文件登记失败',
@@ -1476,7 +1528,8 @@ const canStart = computed(() => {
     selectedDetModel.value &&
     selectedTask.value &&
     selectedDevice.value.length > 0 &&
-    !isDetecting.value
+    !isDetecting.value &&
+    !realtimeSessionId.value
   )
 })
 
@@ -1490,15 +1543,16 @@ const hasPendingReport = computed(
 //==================== 实时模式相关（保留） ====================
 let totalElapsed = 0
 let startTime = 0
-let sampleRate = 44100
-let imuIdx = 0
-let gasIdx = 0
-let swallowIdx = 0
-let imuRows: any[] = []
-let gasRows: any[] = []
-let swallowRows: any[] = []
-let inSwallow = false
-let hasAlertedThisSwallow = false
+// 以下变量用于模拟数据回放模式（已禁用，改为 WebSocket 实时接收）
+// let sampleRate = 44100
+// let imuIdx = 0
+// let gasIdx = 0
+// let swallowIdx = 0
+// let imuRows: any[] = []
+// let gasRows: any[] = []
+// let swallowRows: any[] = []
+// let inSwallow = false
+// let hasAlertedThisSwallow = false
 
 let animationId: number | null = null
 let lastRender = 0
@@ -1532,6 +1586,50 @@ function pruneSeries(series: [number, number][], minTime: number) {
 }
 function capSeries(series: [number, number][], maxLen: number) {
   if (series.length > maxLen) series.splice(0, series.length - maxLen)
+}
+
+function getSeriesTailTime(series: [number, number][]): number {
+  return series.length > 0 ? series[series.length - 1][0] : 0
+}
+
+function normalizeRealtimeTime(
+  series: [number, number][],
+  rawTimeSec: number,
+  minStep = 0.001
+): number {
+  const safe = Number.isFinite(rawTimeSec) ? Math.max(0, rawTimeSec) : 0
+  if (series.length === 0) return +safe.toFixed(3)
+
+  const last = series[series.length - 1][0]
+  if (safe <= last) {
+    return +(last + minStep).toFixed(3)
+  }
+  return +safe.toFixed(3)
+}
+
+function latestRealtimeSeriesTime(): number {
+  return Math.max(
+    getSeriesTailTime(imuSeries.X),
+    getSeriesTailTime(imuSeries.Y),
+    getSeriesTailTime(imuSeries.Z),
+    getSeriesTailTime(gasSeries.value),
+    getSeriesTailTime(audioSeries.value),
+    getSeriesTailTime(dysphagiaRealtimeSeries),
+    getSeriesTailTime(aspirationRealtimeSeries)
+  )
+}
+
+function readClassOneProbability(item: any): number {
+  if (!item) return 0
+
+  const candidate = item.probabilitys ?? item.probabilities ?? item.probability
+  if (Array.isArray(candidate)) {
+    const val = Number(candidate[1] ?? candidate[0] ?? 0)
+    return Number.isFinite(val) ? val : 0
+  }
+
+  const val = Number(candidate ?? 0)
+  return Number.isFinite(val) ? val : 0
 }
 
 function resetUiInputs() {
@@ -1648,6 +1746,7 @@ function resetChartAndData() {
 
   // 重置实时数据基准时间戳
   realtimeBaseTimestamp = 0
+  realtimeRenderCursorSec = 0
 
   imuSeries.X.length = 0
   imuSeries.Y.length = 0
@@ -1663,17 +1762,19 @@ function resetChartAndData() {
   swallowSegments = []
   aspirationSegments = []
 
-  imuIdx = 0
-  gasIdx = 0
-  swallowIdx = 0
-  inSwallow = false
-  hasAlertedThisSwallow = false
+  // imuIdx = 0
+  // gasIdx = 0
+  // swallowIdx = 0
+  // inSwallow = false
+  // hasAlertedThisSwallow = false
 
   hasStopped.value = false
   canReset.value = false
   isInitial.value = true
   reportDialogVisible.value = false
   checkRecordsSaved.value = false
+  realtimeSessionId.value = ''
+  fileDetectSessionId.value = ''
 
   // 重置实时统计数据
   realtimeStats.totalSwallows = 0
@@ -1747,6 +1848,29 @@ function createImuXYZOption(
   }
 }
 
+function formatOccupationStartedAt(value?: string): string {
+  if (!value) return '-'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString()
+}
+
+async function showDeviceOccupiedDialog(result: RealtimeConnectResult) {
+  const occupation = result.occupation
+  const lines = [
+    `设备编号：${occupation?.deviceId || result.deviceId || '-'}`,
+    `占用患者：${occupation?.patientName || '-'}（${occupation?.patientId || '-'}）`,
+    `开始时间：${formatOccupationStartedAt(occupation?.startedAt)}`,
+    `原因：${occupation?.reason || result.reason || '设备正在使用中'}`,
+  ]
+
+  await ElMessageBox.alert(lines.join('<br/>'), '设备已被占用', {
+    type: 'warning',
+    dangerouslyUseHTMLString: true,
+    confirmButtonText: '我知道了',
+  })
+}
+
 async function startDetection() {
   reportData.value.date = formatDateTime(new Date())
   hasStopped.value = false
@@ -1769,6 +1893,7 @@ async function startDetection() {
   }
 
   // 实时模式 - 连接设备并启动WebSocket
+  let hasConnectedDevice = false
   try {
     if (selectedDevice.value.length === 0) {
       ElMessage.error('请先选择设备')
@@ -1798,16 +1923,32 @@ async function startDetection() {
       gasSeries.value.length = 0
       audioSeries.value.length = 0
       realtimeBaseTimestamp = 0
+      realtimeRenderCursorSec = 0
     }
 
     // 连接设备（注意：这里 primaryId 必须是字符串）
-    await connectRealtimeDevice(
+    const connectResult = await connectRealtimeDevice(
       primaryIp, // 设备IP
       primaryId, // 设备ID
-      primaryId,
+      device.name || primaryId,
       selectedPatientId.value, // 患者编号
       selectedPatientName.value // 患者姓名
     )
+
+    if (connectResult.occupied) {
+      realtimeSessionId.value = ''
+      await showDeviceOccupiedDialog(connectResult)
+      return
+    }
+
+    if (!connectResult.success) {
+      realtimeSessionId.value = ''
+      ElMessage.error(connectResult.reason || '设备连接失败')
+      return
+    }
+
+    realtimeSessionId.value = connectResult.sessionId || ''
+    hasConnectedDevice = true
 
     // 建立 WebSocket
     await connectWebSocket(primaryId)
@@ -1820,6 +1961,15 @@ async function startDetection() {
 
     ElMessage.success('设备连接成功,正在接收数据...')
   } catch (error: any) {
+    if (hasConnectedDevice && primaryId) {
+      try {
+        await disconnectRealtimeDevice(primaryId)
+      } catch {
+        // 保持启动错误提示，不覆盖主错误信息
+      }
+    }
+
+    realtimeSessionId.value = ''
     ElMessage.error(error?.message || '连接设备失败')
     isDetecting.value = false
   }
@@ -2358,7 +2508,13 @@ function frame(now: number = performance.now()) {
   lastRender = now
 
   const logicalElapsed = totalElapsed + (now - startTime)
-  const tSec = +(logicalElapsed / 1000).toFixed(3)
+  const elapsedSec = +(logicalElapsed / 1000).toFixed(3)
+  const latestSeriesSec = latestRealtimeSeriesTime()
+  const targetSec = latestSeriesSec > 0 ? latestSeriesSec : elapsedSec
+  if (targetSec > realtimeRenderCursorSec) {
+    realtimeRenderCursorSec = targetSec
+  }
+  const tSec = +realtimeRenderCursorSec.toFixed(3)
   const startShort = +Math.max(0, tSec - durationShort).toFixed(3)
   const endShort = +(startShort + durationShort).toFixed(3)
   const startLong = +Math.max(0, tSec - durationLong).toFixed(3)
@@ -2370,14 +2526,16 @@ function frame(now: number = performance.now()) {
   pruneSeries(dysphagiaRealtimeSeries, startLong)
   pruneSeries(aspirationRealtimeSeries, startLong)
 
-  // 如果数据为空或最后一个点的时间小于当前时间-1秒，添加一个0值点保持图表连续
-  // 注意：这里使用1秒的间隔，避免与预测结果的数据点冲突
-  if (
-    dysphagiaRealtimeSeries.length === 0 ||
-    dysphagiaRealtimeSeries[dysphagiaRealtimeSeries.length - 1][0] < tSec - 1.0
-  ) {
-    dysphagiaRealtimeSeries.push([tSec, 0])
-    aspirationRealtimeSeries.push([tSec, 0])
+  // 当预测结果持续为“未检测到吞咽事件”时，主动补0值基线点，
+  // 保证概率时序图持续推进而不是空白静止。
+  const swallowTailSec = Math.max(
+    getSeriesTailTime(dysphagiaRealtimeSeries),
+    getSeriesTailTime(aspirationRealtimeSeries)
+  )
+  if (swallowTailSec === 0 || swallowTailSec < tSec - 1.0) {
+    const baselineSec = +Math.max(tSec, swallowTailSec + 0.001).toFixed(3)
+    dysphagiaRealtimeSeries.push([baselineSec, 0])
+    aspirationRealtimeSeries.push([baselineSec, 0])
   }
 
   // WebSocket 实时模式下不使用模拟数据
@@ -2686,12 +2844,26 @@ async function startFileModeDetection() {
   ElMessage.info('正在上传文件并进行检测，请稍后…')
 
   try {
+    const patientId = selectedPatientId.value
+    const patientName = selectedPatientName.value || currentPatient.value?.name || ''
+    if (!patientId) {
+      ElMessage.error('请选择患者后再进行文件检测')
+      isDetecting.value = false
+      return
+    }
+
+    fileDetectSessionId.value = ''
+
     // 调用检测接口
     const result: DetectionResponse = await uploadAndPredict(
       uploadedFiles.audio,
       uploadedFiles.imu,
-      uploadedFiles.gas
+      uploadedFiles.gas,
+      patientId,
+      patientName
     )
+
+    fileDetectSessionId.value = result.sessionId || ''
 
     // 检查是否检测到吞咽事件
     if (result.message) {
@@ -2753,11 +2925,11 @@ async function startFileModeDetection() {
         if (inEvent && eventIndex >= 0) {
           // 吞咽障碍检测结果的概率（取第二个类别的概率）
           if (result.dysphagia && result.dysphagia[eventIndex]) {
-            dysphagiaProb = result.dysphagia[eventIndex].probabilitys[1] || 0
+            dysphagiaProb = readClassOneProbability(result.dysphagia[eventIndex])
           }
           // 误吸检测结果的概率
           if (result.aspiration && result.aspiration[eventIndex]) {
-            aspirationProb = result.aspiration[eventIndex].probabilitys[1] || 0
+            aspirationProb = readClassOneProbability(result.aspiration[eventIndex])
           }
         }
 
@@ -2881,7 +3053,8 @@ function initCharts() {
   audioChart = echarts.init(audioRef.value!)
   renderEmptyCharts()
 
-  // 实时模式资源（文件模式不会用到）
+  // 实时模式资源（文件模式不会用到，已禁用改为 WebSocket 实时接收）
+  /*
   fetch(audioUrl)
     .then((res) => res.arrayBuffer())
     .then((buffer) =>
@@ -2912,6 +3085,7 @@ function initCharts() {
     .then((json) => {
       swallowRows = json
     })
+  */
 }
 
 // ==================== WebSocket 实时数据接收 ====================
@@ -3027,7 +3201,8 @@ function handleRealtimeImuData(data: {
   }
 
   // 计算相对时间(秒) - 相对于开始接收数据的时间
-  const relativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
+  const rawRelativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
+  const relativeTimeSec = normalizeRealtimeTime(imuSeries.X, rawRelativeTimeSec)
 
   // 添加到IMU序列中
   imuSeries.X.push([relativeTimeSec, data.x])
@@ -3051,7 +3226,8 @@ function handleRealtimeGasData(data: { timestamp: number; flow: number }) {
   }
 
   // 计算相对时间(秒) - 相对于开始接收数据的时间
-  const relativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
+  const rawRelativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
+  const relativeTimeSec = normalizeRealtimeTime(gasSeries.value, rawRelativeTimeSec)
 
   // 添加到GAS序列中
   gasSeries.value.push([relativeTimeSec, data.flow])
@@ -3074,7 +3250,8 @@ function handleRealtimeAudioData(data: {
   }
 
   // 计算相对时间(秒) - 相对于开始接收数据的时间
-  const relativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
+  const rawRelativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
+  const relativeTimeSec = normalizeRealtimeTime(audioSeries.value, rawRelativeTimeSec)
 
   // 添加到AUDIO序列中
   audioSeries.value.push([relativeTimeSec, data.amplitude])
@@ -3109,12 +3286,15 @@ function handleRealtimePredictionResult(result: any) {
     const totalEvents = swallowEvents.length
 
     // 获取当前相对时间（秒）- 这是从检测开始到现在的总时间
-    const currentRelativeTime =
+    const currentRelativeTime = Math.max(
+      latestRealtimeSeriesTime(),
       (performance.now() - startTime + totalElapsed) / 1000
+    )
 
     // ✅ 使用窗口结束时间（当前时间）作为基准，而不是起始时间
     // 这样吞咽段会出现在图表的右侧（最新位置），而不是中间
     const windowEndTime = currentRelativeTime
+    realtimeRenderCursorSec = Math.max(realtimeRenderCursorSec, windowEndTime)
 
     // 后端预测窗口长度（秒）- 需要与后端保持一致
     const PREDICTION_WINDOW_SEC = 5
@@ -3185,13 +3365,13 @@ function handleRealtimePredictionResult(result: any) {
       // 获取吞咽障碍概率（取第二个类别的概率，即 predicted_class=1 的概率）
       let dysphagiaProb = 0
       if (result.dysphagia && result.dysphagia[idx]) {
-        dysphagiaProb = result.dysphagia[idx].probabilitys[1] || 0
+        dysphagiaProb = readClassOneProbability(result.dysphagia[idx])
       }
 
       // 获取误吸概率（取第二个类别的概率，即 predicted_class=1 的概率）
       let aspirationProb = 0
       if (result.aspiration && result.aspiration[idx]) {
-        aspirationProb = result.aspiration[idx].probabilitys[1] || 0
+        aspirationProb = readClassOneProbability(result.aspiration[idx])
       }
 
       // 移除与新数据时间重叠的旧数据点
@@ -3773,6 +3953,7 @@ watch(isFileMode, async (newVal, oldVal) => {
     await resetAllState()
     if (!newVal && hasChartStarted.value) initCharts() // 切回实时模式才初始化实时资源
   } catch (error : any) {
+    fileDetectSessionId.value = ''
     // 检查是否是用户取消
     if (error === 'cancel' || error === 'close') {
       // 用户点击"取消"，恢复原来的模式

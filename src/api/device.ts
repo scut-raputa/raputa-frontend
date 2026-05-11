@@ -1,12 +1,15 @@
 import { postJson } from '@/utils/request'
+import type { RealtimeConnectResult } from '@/api/realtime'
 
 // 设备发现响应数据类型
 export interface DeviceDiscoveryData {
+  deviceId?: string
   deviceIp: string
   deviceName: string
   status: string
   discoveryTime: number
   deviceInfo: string
+  rtspPath?: string
 }
 
 // 快速设备发现
@@ -30,9 +33,10 @@ export async function connectRealtimeDevice(
   patientName: string
 ) {
   const body = { deviceIp, deviceId, deviceName, patientId, patientName }
-  const resp = await postJson<boolean>('/api/realtime/connect', body, { timeout: 10000 })
+  const resp = await postJson<RealtimeConnectResult>('/api/realtime/connect', body, { timeout: 10000 })
   const ok = resp?.code === 0 || resp?.code === 200
   if (!ok) throw new Error(resp?.message || '设备连接失败')
+  if (!resp.data) throw new Error(resp?.message || '设备连接失败')
   return resp.data
 }
 

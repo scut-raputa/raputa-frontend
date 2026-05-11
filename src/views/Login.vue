@@ -8,6 +8,7 @@
         :rules="rules"
         class="login-form"
         label-width="0"
+        @keyup.enter.prevent="onSubmit"
       >
         <el-form-item prop="username">
           <el-input
@@ -94,8 +95,9 @@ async function onSubmit() {
     setUser(res.data.user)
 
     ElMessage.success({ message: '登录成功，正在进入仪表盘', duration: 1200 })
+    const homePath = res.data.user.role === 'ADMIN' ? '/dashboard/system' : '/dashboard/patient'
     setTimeout(() => {
-      router.push('/dashboard/patient')
+      router.push(homePath)
     }, 1200)
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
