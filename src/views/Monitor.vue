@@ -3250,8 +3250,7 @@ function handleRealtimeAudioData(data: {
   }
 
   // 计算相对时间(秒) - 相对于开始接收数据的时间
-  const rawRelativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
-  const relativeTimeSec = normalizeRealtimeTime(audioSeries.value, rawRelativeTimeSec)
+  const relativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
 
   // 添加到AUDIO序列中
   audioSeries.value.push([relativeTimeSec, data.amplitude])
