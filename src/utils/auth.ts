@@ -1,29 +1,23 @@
 import type { UserVO } from '@/types/user'
 
-const TOKEN_KEY = 'raputa_token'
-const USER_KEY = 'raputa_user'
+let currentUser: UserVO | null = null
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  return null
 }
-export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token)
+export function setToken(_token: string) {
+  // Token is stored only in the HttpOnly RAPUTA_SESSION cookie.
 }
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY)
+  // Cookie cleanup is handled by POST /api/user/logout.
 }
 
 export function getUser(): UserVO | null {
-  try {
-    const s = localStorage.getItem(USER_KEY)
-    return s ? (JSON.parse(s) as UserVO) : null
-  } catch {
-    return null
-  }
+  return currentUser
 }
 export function setUser(u: UserVO) {
-  localStorage.setItem(USER_KEY, JSON.stringify(u))
+  currentUser = u
 }
 export function clearUser() {
-  localStorage.removeItem(USER_KEY)
+  currentUser = null
 }

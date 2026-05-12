@@ -4,7 +4,6 @@
       <!-- 顶栏 -->
       <el-header class="header">
         <div class="header-left">
-          <img src="@/assets/logo.svg" class="logo" alt="Logo" />
           <span class="system-name">吞咽障碍智能检测系统</span>
         </div>
         <div class="header-right">
@@ -126,7 +125,8 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getUser, clearToken, clearUser } from '@/utils/auth'
+import { getUser, clearUser } from '@/utils/auth'
+import { logoutUser } from '@/api/user'
 import type { UserVO } from '@/types/user'
 import {
   Fold,
@@ -166,10 +166,14 @@ onMounted(() => {
   activeMenu.value = route.path
 })
 
-function logout() {
+async function logout() {
   ElMessage.success({ message: '已登出，正在跳转到登录页', duration: 1500 })
-  setTimeout(() => {
-    clearToken()
+  setTimeout(async () => {
+    try {
+      await logoutUser()
+    } catch {
+      // 即使网络异常，也清理前端内存态并回到登录页。
+    }
     clearUser()
     router.push('/login')
   }, 1500)
@@ -238,21 +242,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.5rem;
+  padding: 0 2rem;
   box-sizing: border-box;
   z-index: 1000;
 }
 .header-left {
   display: flex;
   align-items: center;
-}
-.logo {
-  height: 36px;
-  margin-right: 0.5rem;
+  min-width: 0;
 }
 .system-name {
   font-size: 1.25rem;
   font-weight: bold;
+  padding-left: 0.25rem;
 }
 .header-right {
   display: flex;

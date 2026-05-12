@@ -1,38 +1,20 @@
-import axios, {
-  AxiosError,
-  AxiosHeaders,
-  type InternalAxiosRequestConfig,
-} from 'axios'
-import { getToken, clearToken, clearUser } from '@/utils/auth'
+import axios, { AxiosError } from 'axios'
 import type { ApiResponse } from '@/types/response'
+
+axios.defaults.withCredentials = true
 
 const instance = axios.create({
   baseURL: '',
   timeout: 10000,
-})
-
-instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = getToken()
-  if (token) {
-    const headers = new AxiosHeaders(config.headers as any)
-    headers.set('Authorization', `Bearer ${token}`)
-    config.headers = headers
-  }
-  return config
+  withCredentials: true,
 })
 
 instance.interceptors.response.use(
   (resp) => resp.data,
   (error: AxiosError<any>) => {
-    const status = error.response?.status
     const serverMsg = (error.response?.data as any)?.message
     if (serverMsg) error.message = serverMsg
 
-    if (status === 401) {
-      clearToken()
-      clearUser()
-      window.location.replace('/login')
-    }
     return Promise.reject(error)
   },
 )

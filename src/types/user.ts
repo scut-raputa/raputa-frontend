@@ -26,6 +26,6 @@ export interface LoginPayload {
 }
 
 export interface LoginData {
-  token: string
+  token?: string | null
   user: UserVO
 }

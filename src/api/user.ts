@@ -20,3 +20,11 @@ export function loginUser(payload: LoginPayload) {
     payload,
   )
 }
+
+export function getCurrentUser() {
+  return request.get<ApiResponse<UserVO>, ApiResponse<UserVO>>('/api/user/me')
+}
+
+export function logoutUser() {
+  return request.post<ApiResponse<null>, ApiResponse<null>>('/api/user/logout')
+}

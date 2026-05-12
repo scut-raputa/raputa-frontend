@@ -101,35 +101,7 @@
           </template>
         </el-select-v2>
 
-        <el-select
-          v-model="selectedSegModel"
-          placeholder="请选择分割模型"
-          size="small"
-          class="setting-item"
-          clearable
-        >
-          <template #prefix>
-            <el-icon><DataLine /></el-icon>
-          </template>
-          <el-option label="吞咽分割模型A" value="segA" />
-          <el-option label="吞咽分割模型B" value="segB" />
-        </el-select>
-
-        <el-select
-          v-model="selectedDetModel"
-          placeholder="请选择检测模型"
-          size="small"
-          class="setting-item"
-          clearable
-        >
-          <template #prefix>
-            <el-icon><DataAnalysis /></el-icon>
-          </template>
-          <el-option label="吞咽障碍筛查模型C" value="detC" />
-          <el-option label="误吸检测模型D" value="detD" />
-        </el-select>
-
-        <!-- 任务在文件模式下非必填，保留选择 -->
+        <!-- 检测任务选择 -->
         <el-select
           v-model="selectedTask"
           placeholder="请选择任务"
@@ -140,9 +112,9 @@
           <template #prefix>
             <el-icon><Operation /></el-icon>
           </template>
+          <el-option label="吞咽分割" value="seg" />
           <el-option label="吞咽障碍筛查" value="dys" />
           <el-option label="误吸检测" value="asp" />
-          <el-option label="吞咽障碍筛查+误吸检测" value="both" />
         </el-select>
 
         <!-- 设备仅用于实时模式；文件模式不必选，仍保留控件以便切换 -->
@@ -423,6 +395,8 @@
           v-for="(key, idx) in csvHeaders"
           :key="idx"
           :label="key || `列${idx + 1}`"
+          min-width="120"
+          show-overflow-tooltip
         >
           <template #default="scope">{{ scope.row[key] }}</template>
         </el-table-column>
@@ -557,7 +531,6 @@ import { onBeforeRouteLeave } from 'vue-router'
 import {
   User,
   DataLine,
-  DataAnalysis,
   Operation,
   VideoPlay,
   VideoPause,
@@ -614,7 +587,7 @@ const selectedPatientName = computed(() => {
   return hit?.name ?? ''
 })
 
-// 当前登录用户（从 localStorage 读取一次即可）
+// 当前登录用户（由路由守卫从服务端会话写入内存态）
 const currentUser = ref<UserVO | null>(getUser())
 
 // 当前登录账号所在科室 / 医院
@@ -633,6 +606,7 @@ interface PatientDetail {
   gender?: string
   age?: number
   outpatientId?: string
+  dept?: string
 }
 
 // 当前选中患者详情（还没接后端的话，就先留 null）
@@ -653,6 +627,7 @@ async function fetchPatientDetailById(id: string) {
         age: p.age ?? undefined,
         // outpatientId 现在可能还没加到 PatientRow，先尝试从返回体里取一下
         outpatientId: (p as any).outpatientId ?? undefined,
+        dept: p.dept ?? undefined,
       }
     } else {
       // 没查到就用下拉里的名字兜底
@@ -871,9 +846,7 @@ let aspirationSegments: [number, number][] = [] // 存储误吸时间段（用�
 // const audioUrl = new URL('@/mock/signals/audio.wav', import.meta.url).href
 
 // 控制变量
-const selectedSegModel = ref('segA') // 默认选择第一个分割模型
-const selectedDetModel = ref('detC') // 默认选择第一个检测模型
-const selectedTask = ref('both') // 默认选择第一个任务
+const selectedTask = ref('seg') // 默认选择第一个任务
 const selectedDevice = ref<string[]>([])
 const isDetecting = ref(false)
 const hasStopped = ref(false)
@@ -1228,8 +1201,8 @@ function openReportDialog() {
   reportData.value.outpatientId =
     patient?.outpatientId || reportData.value.outpatientId
 
-  // 申请科室：当前登录用户所在科室
-  reportData.value.department = currentDepartmentName.value
+  // 申请科室：优先使用患者档案科室；操作者科室只作为兜底。
+  reportData.value.department = patient?.dept || currentDepartmentName.value
 
   // 🟡 检测时间：显示在患者信息栏的“检测时间”
   reportData.value.date = formatDateTime(now)
@@ -1514,18 +1487,15 @@ const canStart = computed(() => {
   if (isFileMode.value) {
     return !!(
       hasPatient &&
-      selectedSegModel.value &&
-      selectedDetModel.value &&
+      selectedTask.value &&
       filePayloadReady.value &&
       !isDetecting.value
     )
   }
-  // 实时模式：患者+模型+任务+至少一个设备
+  // 实时模式：患者+任务+至少一个设备
   return !!(
     !isFileMode.value &&
     hasPatient &&
-    selectedSegModel.value &&
-    selectedDetModel.value &&
     selectedTask.value &&
     selectedDevice.value.length > 0 &&
     !isDetecting.value &&
@@ -1634,9 +1604,7 @@ function readClassOneProbability(item: any): number {
 
 function resetUiInputs() {
   selectedPatientId.value = ''
-  selectedSegModel.value = 'segA'
-  selectedDetModel.value = 'detC'
-  selectedTask.value = 'both'
+  selectedTask.value = 'seg'
   selectedDevice.value = []
 }
 
@@ -1807,9 +1775,9 @@ function createImuXYZOption(
       top: 8,
       itemGap: 4,
     },
-    grid: { top: 40, bottom: 24, left: 40, right: 20 },
+    grid: SIGNAL_GRID,
     xAxis: createXAxis(start, end),
-    yAxis: { type: 'value' },
+    yAxis: createSignalYAxis(-400, 400),
     series: [
       {
         name: '喉运动信号 X',
@@ -2100,15 +2068,61 @@ function renderEmptyCharts() {
   }
 }
 
-// 文件模式：不固定 min/max
+// 信号图表统一坐标轴与网格样式，确保初始状态也展示清晰刻度。
+const SIGNAL_GRID = { top: 40, bottom: 28, left: 52, right: 20 }
+const SIGNAL_AXIS_COLOR = '#6b7280'
+const SIGNAL_GRID_COLOR = '#dbe3ef'
+
+function createSignalYAxis(
+  min: number,
+  max: number,
+  formatter?: (value: number) => string
+): echarts.YAXisComponentOption {
+  return {
+    type: 'value',
+    min,
+    max,
+    splitNumber: 4,
+    axisLabel: {
+      formatter: (value: number) => formatter?.(value) ?? `${value}`,
+    },
+    axisTick: {
+      show: true,
+      lineStyle: { color: SIGNAL_AXIS_COLOR },
+    },
+    axisLine: {
+      show: true,
+      lineStyle: { color: SIGNAL_AXIS_COLOR },
+    },
+    splitLine: {
+      show: true,
+      lineStyle: { color: SIGNAL_GRID_COLOR },
+    },
+  }
+}
+
 function createXAxisAuto(): echarts.XAXisComponentOption {
   return {
     type: 'value',
     boundaryGap: [0, 0],
+    splitNumber: 5,
     axisLabel: {
       showMinLabel: true,
       showMaxLabel: true,
       formatter: (val: number) => `${val.toFixed(2)}s`,
+    },
+    axisTick: {
+      show: true,
+      lineStyle: { color: SIGNAL_AXIS_COLOR },
+    },
+    axisLine: {
+      show: true,
+      onZero: true,
+      lineStyle: { color: SIGNAL_AXIS_COLOR },
+    },
+    splitLine: {
+      show: true,
+      lineStyle: { color: SIGNAL_GRID_COLOR },
     },
   }
 }
@@ -2118,12 +2132,28 @@ function createXAxis(start: number, end: number): echarts.XAXisComponentOption {
     type: 'value',
     min: start,
     max: end,
+    splitNumber: 5,
     axisLabel: {
+      showMinLabel: true,
+      showMaxLabel: true,
       formatter: (val: number) => {
         if (Math.abs(val - start) < 0.01) return `${start.toFixed(2)}s`
         if (Math.abs(val - end) < 0.01) return `${end.toFixed(2)}s`
         return ''
       },
+    },
+    axisTick: {
+      show: true,
+      lineStyle: { color: SIGNAL_AXIS_COLOR },
+    },
+    axisLine: {
+      show: true,
+      onZero: true,
+      lineStyle: { color: SIGNAL_AXIS_COLOR },
+    },
+    splitLine: {
+      show: true,
+      lineStyle: { color: SIGNAL_GRID_COLOR },
     },
   }
 }
@@ -2142,24 +2172,17 @@ function createSingleOption(
     吞咽声音信号: '#73C0DE',
   }
   
-  // 呼吸信号使用以0为中心的Y轴
-  const yAxisConfig = title === '呼吸信号' 
-    ? { 
-        type: 'value' as const, 
-        min: -50, 
-        max: 50,
-        axisLine: {
-          show: true,
-          onZero: true,
-          lineStyle: { color: '#999' }
-        }
-      }
-    : { type: 'value' as const }
+  const yAxisConfig =
+    title === '呼吸信号'
+      ? createSignalYAxis(-60, 60)
+      : title === '吞咽声音信号'
+        ? createSignalYAxis(-0.4, 0.4, (value) => value.toFixed(1))
+        : createSignalYAxis(-400, 400)
   
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
     legend: { data: [title], top: 8, itemGap: 4 },
-    grid: { top: 40, bottom: 24, left: 40, right: 20 },
+    grid: SIGNAL_GRID,
     xAxis: createXAxis(start, end),
     yAxis: yAxisConfig,
     series: [
@@ -2198,7 +2221,7 @@ function createSwallowOption(
       },
     },
     legend: { data: ['吞咽障碍概率', '误吸概率'], top: 8, itemGap: 4 },
-    grid: { top: 40, bottom: 24, left: 40, right: 20 },
+    grid: SIGNAL_GRID,
     xAxis: createXAxis(start, end),
     yAxis: {
       type: 'value',
@@ -2243,7 +2266,7 @@ function createSwallowOptionFile(
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
     legend: { data: ['吞咽段识别', '吞咽风险概率'], top: 8, itemGap: 4 },
-    grid: { top: 40, bottom: 24, left: 40, right: 20 },
+    grid: SIGNAL_GRID,
     xAxis: createXAxisAuto(),
     yAxis: { type: 'value', min: 0, max: 1 },
     series: [
@@ -2299,7 +2322,7 @@ function createSwallowRiskOptionFile(
       },
     },
     legend: { data: ['吞咽障碍概率', '误吸概率'], top: 8, itemGap: 4 },
-    grid: { top: 40, bottom: 24, left: 40, right: 20 },
+    grid: SIGNAL_GRID,
     xAxis: createXAxisAuto(),
     yAxis: {
       type: 'value',
@@ -2360,9 +2383,9 @@ function createImuXYZOptionFile(
       top: 8,
       itemGap: 4,
     },
-    grid: { top: 40, bottom: 24, left: 40, right: 20 },
+    grid: SIGNAL_GRID,
     xAxis: createXAxisAuto(),
-    yAxis: { type: 'value' },
+    yAxis: createSignalYAxis(-400, 400),
     series: [
       {
         name: '喉运动信号 X',
@@ -2413,19 +2436,12 @@ function createSingleOptionFile(
     吞咽声音信号: '#73C0DE',
   }
   
-  // 呼吸信号使用以0为中心的Y轴
-  const yAxisConfig = title === '呼吸信号' 
-    ? { 
-        type: 'value' as const, 
-        min: -50, 
-        max: 50,
-        axisLine: {
-          show: true,
-          onZero: true,
-          lineStyle: { color: '#999' }
-        }
-      }
-    : { type: 'value' as const }
+  const yAxisConfig =
+    title === '呼吸信号'
+      ? createSignalYAxis(-60, 60)
+      : title === '吞咽声音信号'
+        ? createSignalYAxis(-0.4, 0.4, (value) => value.toFixed(1))
+        : createSignalYAxis(-400, 400)
   
   return {
     tooltip: {
@@ -2445,7 +2461,7 @@ function createSingleOptionFile(
       },
     },
     legend: { data: [title], top: 8, itemGap: 4 },
-    grid: { top: 40, bottom: 24, left: 40, right: 20 },
+    grid: SIGNAL_GRID,
     xAxis: createXAxisAuto(),
     yAxis: yAxisConfig,
     series: [
@@ -2616,44 +2632,9 @@ function frame(now: number = performance.now()) {
         top: 8,
         itemGap: 4,
       },
-      grid: { top: 40, bottom: 24, left: 40, right: 20 },
-      xAxis: {
-        type: 'value',
-        min: startShort,
-        max: endShort,
-        axisLabel: {
-          showMinLabel: true,
-          showMaxLabel: true,
-          formatter: (val: number) => {
-            if (Math.abs(val - startShort) < 0.01)
-              return `${startShort.toFixed(1)}s`
-            if (Math.abs(val - endShort) < 0.01)
-              return `${endShort.toFixed(1)}s`
-            return ''
-          },
-        },
-        axisTick: {
-          show: false,
-        },
-        axisLine: {
-          show: false, // 隐藏X轴线
-        },
-        splitLine: {
-          show: false, // 隐藏网格线
-        },
-      },
-      yAxis: {
-        type: 'value',
-        min: -400, // 调整为-300到300
-        max: 400,
-        splitLine: {
-          show: true,
-          lineStyle: {
-            color: '#f0f0f0',
-            type: 'dashed',
-          },
-        },
-      },
+      grid: SIGNAL_GRID,
+      xAxis: createXAxis(startShort, endShort),
+      yAxis: createSignalYAxis(-400, 400),
       series: [
         {
           name: '喉运动信号 X',
@@ -2691,51 +2672,9 @@ function frame(now: number = performance.now()) {
     {
       tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
       legend: { data: ['呼吸信号'], top: 8, itemGap: 4 },
-      grid: { top: 40, bottom: 24, left: 40, right: 20 },
-      xAxis: {
-        type: 'value',
-        min: startShort,
-        max: endShort,
-        axisLabel: {
-          showMinLabel: true,
-          showMaxLabel: true,
-          formatter: (val: number) => {
-            if (Math.abs(val - startShort) < 0.01)
-              return `${startShort.toFixed(1)}s`
-            if (Math.abs(val - endShort) < 0.01)
-              return `${endShort.toFixed(1)}s`
-            return ''
-          },
-        },
-        axisTick: {
-          show: false,
-        },
-        axisLine: {
-          show: false, // 隐藏X轴线
-        },
-        splitLine: {
-          show: false, // 隐藏网格线
-        },
-      },
-      yAxis: {
-        type: 'value',
-        min: -50, // Y轴范围：-50 到 50，0在中间
-        max: 50,
-        splitLine: {
-          show: true,
-          lineStyle: {
-            color: '#f0f0f0',
-            type: 'dashed',
-          },
-        },
-        axisLine: {
-          show: true,
-          onZero: true, // 在0值位置显示轴线
-          lineStyle: {
-            color: '#999',
-          },
-        },
-      },
+      grid: SIGNAL_GRID,
+      xAxis: createXAxis(startShort, endShort),
+      yAxis: createSignalYAxis(-60, 60),
       series: [
         {
           name: '呼吸信号',
@@ -2768,35 +2707,9 @@ function frame(now: number = performance.now()) {
         },
       },
       legend: { data: ['吞咽声音信号'], top: 8, itemGap: 4 },
-      grid: { top: 40, bottom: 24, left: 40, right: 20 },
-      xAxis: {
-        type: 'value',
-        min: startShort,
-        max: endShort,
-        axisLabel: {
-          showMinLabel: true,
-          showMaxLabel: true,
-          formatter: (val: number) => {
-            if (Math.abs(val - startShort) < 0.01)
-              return `${startShort.toFixed(1)}s`
-            if (Math.abs(val - endShort) < 0.01)
-              return `${endShort.toFixed(1)}s`
-            return ''
-          },
-        },
-        axisTick: { show: false },
-        axisLine: { show: false },
-        splitLine: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        min: -0.4,
-        max: 0.4,
-        splitLine: {
-          show: true,
-          lineStyle: { color: '#f0f0f0', type: 'dashed' },
-        },
-      },
+      grid: SIGNAL_GRID,
+      xAxis: createXAxis(startShort, endShort),
+      yAxis: createSignalYAxis(-0.4, 0.4, (value) => value.toFixed(1)),
       series: [
         {
           name: '吞咽声音信号',
@@ -4043,7 +3956,7 @@ onBeforeRouteLeave((to, from, next) => {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 12px;
+  gap: 8px;
 }
 .setting-item {
   flex: 1 1 0;

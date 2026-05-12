@@ -7,7 +7,7 @@
       </template>
 
       <!-- 第一行：可过滤多选 -->
-      <div class="console-row">
+      <div class="console-row patient-picker-row">
         <el-select-v2
           v-model="selectedPatients"
           filterable
@@ -39,7 +39,7 @@
       </div>
 
       <!-- 第二行：其他条件与按钮 -->
-      <div class="console-row">
+      <div class="console-row console-filter-row">
         <el-input
           v-model="searchId"
           placeholder="搜索患者 ID"
@@ -565,31 +565,34 @@ async function onExportAll() {
 .console-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
 .console-item {
-  flex: 1 1 200px;
-}
-
-.console-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.console-full {
-  flex: 1 1 100%;
-}
-
-.console-item {
-  flex: 1 1 200px;
+  width: 100% !important;
   min-width: 160px;
 }
 
+.console-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.patient-picker-row {
+  grid-template-columns: 1fr;
+}
+
+.console-filter-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) max-content;
+}
+
+.console-full {
+  width: 100%;
+}
+
 .export-btn {
-  flex: 0 0 auto;
+  align-self: center;
 }
 
 .card-grid {
@@ -642,7 +645,7 @@ async function onExportAll() {
 .patient-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 12px;
 }
 .patient-controls .el-button {
@@ -694,7 +697,7 @@ async function onExportAll() {
 .patient-controls-row {
   display: flex;
   flex-direction: row;
-  gap: 10px;
+  gap: 8px;
 }
 
 .filter-date {
@@ -737,4 +740,9 @@ async function onExportAll() {
 
 .time-slot { margin: 6px 0 10px 8px; }
 .time-slot-title { color: #666; font-size: 13px; margin: 4px 0; }
+@media (max-width: 1200px) {
+  .console-filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 </style>

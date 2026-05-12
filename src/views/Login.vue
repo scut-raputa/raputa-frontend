@@ -62,7 +62,7 @@ import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from 'axios'
 import { loginUser } from '@/api/user'
-import { setToken, setUser } from '@/utils/auth'
+import { setUser } from '@/utils/auth'
 
 const router = useRouter()
 const formRef = ref<FormInstance | null>(null)
@@ -91,7 +91,6 @@ async function onSubmit() {
       return
     }
 
-    setToken(res.data.token)
     setUser(res.data.user)
 
     ElMessage.success({ message: '登录成功，正在进入仪表盘', duration: 1200 })

@@ -8,7 +8,7 @@
         </template>
 
         <div class="controls-row">
-          <el-input v-model="deviceSearchId" placeholder="搜索设备编号" size="small"
+          <el-input v-model="deviceSearchId" placeholder="搜索资产编号" size="small"
             clearable style="width: 200px">
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
@@ -45,9 +45,9 @@
           class="table" style="margin-bottom: 16px"
           :row-class-name="deviceRowClassName"
           :row-style="row35Style" :cell-style="cell35Style">
-          <el-table-column prop="id" label="设备编号" min-width="110" />
-          <el-table-column prop="name" label="设备名称" min-width="140" />
-          <el-table-column prop="lastConnectedTime" label="上次连接时间" min-width="160" />
+          <el-table-column prop="id" label="资产编号" min-width="110" show-overflow-tooltip />
+          <el-table-column prop="name" label="设备名称" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="ip" label="当前IP" min-width="130" />
           <el-table-column label="设备状态" width="90">
             <template #default="{ row }">
               <template v-if="!row.__filler">
@@ -64,16 +64,20 @@
                   占用中
                 </el-tag>
                 <span v-else class="muted">空闲</span>
-                <div v-if="row.occupied" class="occupied-detail">
-                  {{ row.occupiedPatientName || '-' }}（{{ row.occupiedPatientId || '-' }}）
-                </div>
+                <el-tooltip
+                  v-if="row.occupied"
+                  :content="`${row.occupiedPatientName || '-'}（${row.occupiedPatientId || '-'}）`"
+                  placement="top"
+                >
+                  <span class="occupied-detail">
+                    {{ row.occupiedPatientName || '-' }}（{{ row.occupiedPatientId || '-' }}）
+                  </span>
+                </el-tooltip>
               </template>
             </template>
           </el-table-column>
-          <el-table-column prop="description" label="设备描述" min-width="200" show-overflow-tooltip />
-          <el-table-column prop="storageLocation" label="设备保管地点" min-width="130" />
-          <el-table-column prop="responsible" label="负责人" min-width="90" />
-          <el-table-column label="操作" width="290">
+          <el-table-column prop="responsible" label="负责人" min-width="100" show-overflow-tooltip />
+          <el-table-column label="操作" width="270" fixed="right">
             <template #default="{ row }">
               <template v-if="!row.__filler">
                 <el-button size="small" :type="row.status === '在线' ? 'primary' : 'default'"
@@ -135,11 +139,11 @@
           class="table" style="margin-bottom: 16px"
           :row-class-name="docRowClassName"
           :row-style="row35Style" :cell-style="cell35Style">
-          <el-table-column prop="id" label="工号" min-width="100" />
-          <el-table-column prop="name" label="姓名" min-width="100" />
-          <el-table-column prop="department" label="所属科室" min-width="120" />
-          <el-table-column prop="title" label="职称" min-width="110" />
-          <el-table-column prop="phone" label="联系电话" min-width="130" />
+          <el-table-column prop="id" label="工号" min-width="100" show-overflow-tooltip />
+          <el-table-column prop="name" label="姓名" min-width="100" show-overflow-tooltip />
+          <el-table-column prop="department" label="所属科室" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="title" label="职称" min-width="110" show-overflow-tooltip />
+          <el-table-column prop="phone" label="联系电话" min-width="130" show-overflow-tooltip />
           <el-table-column label="操作" width="160">
             <template #default="{ row }">
               <template v-if="!row.__filler">
@@ -167,8 +171,11 @@
         <el-form-item label="设备名称" prop="name">
           <el-input v-model="deviceForm.name" placeholder="如：吞咽记录仪 A1" />
         </el-form-item>
-        <el-form-item label="设备IP" prop="ip">
-          <el-input v-model="deviceForm.ip" placeholder="如：192.168.1.20（可选）" />
+        <el-form-item label="硬件标识">
+          <el-input v-model="deviceForm.hardwareId" placeholder="MAC / 序列号，用于固定识别设备" />
+        </el-form-item>
+        <el-form-item label="当前IP" prop="ip">
+          <el-input v-model="deviceForm.ip" placeholder="局域网当前地址，可由发现服务自动更新" />
         </el-form-item>
         <el-form-item label="设备状态" prop="status">
           <el-select v-model="deviceForm.status" style="width: 100%">
@@ -241,6 +248,8 @@ import {
 // ─── 常量 ──────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 8
 const DOC_PAGE_SIZE = 8
+const DEVICE_MAX_FILLER_ROWS = 3
+const DOCTOR_MAX_FILLER_ROWS = 5
 const TITLE_OPTIONS = ['主任医师', '副主任医师', '主治医师', '住院医师']
 
 // ─── 通用辅助 ───────────────────────────────────────────────────────────────
@@ -256,8 +265,8 @@ function toIsoLocal(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
-function fillerRows<T>(data: T[], size: number): any[] {
-  const pad = size - data.length
+function fillerRows<T>(data: T[], size: number, maxFillers: number): any[] {
+  const pad = Math.min(size - data.length, maxFillers)
   if (pad <= 0) return data as any[]
   return (data as any[]).concat(Array.from({ length: pad }, (_, i) => ({ __filler: true, __key: i })))
 }
@@ -277,7 +286,7 @@ const deviceLocationFilter = ref('')
 const locationOptions = ref<string[]>([])
 const togglingId = ref<string | null>(null)
 
-const deviceRows = computed(() => fillerRows(deviceData.value, PAGE_SIZE))
+const deviceRows = computed(() => fillerRows(deviceData.value, PAGE_SIZE, DEVICE_MAX_FILLER_ROWS))
 function deviceRowClassName({ row }: { row: any }) { return row.__filler ? 'is-filler' : '' }
 
 async function fetchDevices() {
@@ -360,14 +369,14 @@ const deviceEditingId = ref('')
 const deviceSubmitting = ref(false)
 const deviceFormRef = ref<FormInstance>()
 const deviceConnectedTime = ref<Date | null>(null)
-const deviceForm = ref({ name: '', ip: '', status: '离线', description: '', storageLocation: '', responsible: '' })
+const deviceForm = ref({ name: '', ip: '', hardwareId: '', status: '离线', description: '', storageLocation: '', responsible: '' })
 const deviceRules = {
   name:   [{ required: true, message: '请输入设备名称', trigger: 'blur' }],
   status: [{ required: true, message: '请选择设备状态', trigger: 'change' }],
 }
 
 function resetDeviceForm() {
-  deviceForm.value = { name: '', ip: '', status: '离线', description: '', storageLocation: '', responsible: '' }
+  deviceForm.value = { name: '', ip: '', hardwareId: '', status: '离线', description: '', storageLocation: '', responsible: '' }
   deviceConnectedTime.value = null
   deviceFormRef.value?.clearValidate()
 }
@@ -379,6 +388,7 @@ function openDeviceEdit(row: DeviceRow) {
   deviceForm.value = {
     name: row.name ?? '',
     ip: row.ip ?? '',
+    hardwareId: row.hardwareId ?? '',
     status: row.status ?? '离线',
     description: row.description ?? '',
     storageLocation: row.storageLocation ?? '',
@@ -431,7 +441,7 @@ const docSearchDept = ref('')
 const docSearchPhone = ref('')
 const docTitleFilter = ref('')
 
-const doctorRows = computed(() => fillerRows(doctorData.value, DOC_PAGE_SIZE))
+const doctorRows = computed(() => fillerRows(doctorData.value, DOC_PAGE_SIZE, DOCTOR_MAX_FILLER_ROWS))
 function docRowClassName({ row }: { row: any }) { return row.__filler ? 'is-filler' : '' }
 
 async function fetchDoctors() {
@@ -555,12 +565,17 @@ async function submitDoctor() {
   justify-content: center;
 }
 .controls-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) max-content;
   align-items: center;
   margin-bottom: 12px;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
+}
+.controls-row > :deep(.el-input),
+.controls-row > :deep(.el-select) {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
 }
 .icon-with-margin {
   margin-right: 4px;
@@ -569,12 +584,23 @@ async function submitDoctor() {
   color: #909399;
 }
 .occupied-detail {
-  margin-top: 4px;
+  display: inline-block;
+  max-width: calc(100% - 52px);
+  margin-left: 6px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   color: #e6a23c;
 }
 :deep(.el-table__body tr.is-filler .cell) {
   visibility: hidden;
   pointer-events: none;
+}
+@media (max-width: 1200px) {
+  .controls-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

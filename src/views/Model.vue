@@ -41,7 +41,7 @@
             placeholder="模型名称"
             clearable
             size="small"
-            style="max-width: 220px"
+            class="filter-control"
           >
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
@@ -51,12 +51,18 @@
             placeholder="任务类型"
             clearable
             size="small"
-            style="max-width: 220px"
+            class="filter-control"
           >
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
 
-          <el-select v-model="filters.loaded" clearable placeholder="加载状态" size="small" style="max-width: 180px">
+          <el-select
+            v-model="filters.loaded"
+            clearable
+            placeholder="加载状态"
+            size="small"
+            class="filter-control"
+          >
             <el-option label="已加载" value="true" />
             <el-option label="未加载" value="false" />
           </el-select>
@@ -66,7 +72,7 @@
             clearable
             placeholder="可用状态"
             size="small"
-            style="max-width: 180px"
+            class="filter-control"
           >
             <el-option label="可用" value="true" />
             <el-option label="不可用" value="false" />
@@ -81,9 +87,9 @@
             </div>
           </template>
 
-          <el-table-column prop="name" label="模型名称" min-width="150" />
-          <el-table-column prop="taskType" label="任务类型" min-width="120" />
-          <el-table-column prop="modelVersion" label="模型版本" min-width="160" />
+          <el-table-column prop="name" label="模型名称" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="taskType" label="任务类型" min-width="190" show-overflow-tooltip />
+          <el-table-column prop="modelVersion" label="模型版本" min-width="160" show-overflow-tooltip />
           <el-table-column prop="deployPath" label="部署位置" min-width="220" show-overflow-tooltip />
 
           <el-table-column label="是否已加载" min-width="110">
@@ -286,7 +292,8 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
-  min-width: 1304px;
+  width: 1304px;
+  max-width: 100%;
 }
 
 .stat-card,
@@ -299,6 +306,10 @@ onMounted(() => {
 
 .table-card {
   grid-column: 1 / span 3;
+}
+
+:deep(.el-card__header) {
+  padding: 6px 0;
 }
 
 .stat-title {
@@ -334,8 +345,13 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 32px;
   font-size: 1.1rem;
   font-weight: 600;
+}
+
+.card-header .el-button {
+  align-self: center;
 }
 
 .icon-with-margin {
@@ -343,10 +359,15 @@ onMounted(() => {
 }
 
 .filter-row {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   margin-bottom: 14px;
-  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-control {
+  width: 100%;
 }
 
 .model-table {
@@ -377,6 +398,10 @@ onMounted(() => {
 
   .table-card {
     grid-column: auto;
+  }
+
+  .filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

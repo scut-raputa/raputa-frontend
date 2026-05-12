@@ -4,7 +4,7 @@
       <!-- 折线图 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
-          <div class="card-header">每日检测患者数量</div>
+          <div class="card-header">每日检测患者数（去重）</div>
         </template>
         <v-chart
           :option="lineOption"
@@ -17,7 +17,7 @@
       <!-- 柱形图 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
-          <div class="card-header">每日患者检测结果情况</div>
+          <div class="card-header">每日检测结果分布</div>
         </template>
         <v-chart
           :option="barOption"
@@ -30,7 +30,7 @@
       <!-- 饼图 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
-          <div class="card-header">各科室吞咽相关疾病人群占比</div>
+          <div class="card-header">各科室检测患者占比</div>
         </template>
         <v-chart
           :option="pieOption"
@@ -43,7 +43,7 @@
       <!-- 设备状态 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
-          <div class="card-header">每日设备使用时长</div>
+          <div class="card-header">每日设备使用时长（会话）</div>
         </template>
         <v-chart
           :option="riverOption"
@@ -188,7 +188,7 @@ const barOption = computed(() => ({
   },
   yAxis: {
     type: 'value',
-    name: '人数',
+    name: '结果数',
     nameLocation: 'middle',
     nameGap: 40,
     axisLine: { show: true },
@@ -361,9 +361,10 @@ const riverOption = computed(() => ({
 }
 .controls-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   margin-bottom: 12px;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

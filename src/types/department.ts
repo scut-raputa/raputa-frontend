@@ -2,6 +2,7 @@ export type DeviceRow = {
     id: string
     name: string
     ip: string | null
+    hardwareId: string | null
     lastConnectedTime: string | null
   lastSeenAt: string | null
     status: '在线' | '离线'
@@ -32,6 +33,7 @@ export type DeviceRow = {
   export type DeviceFormData = {
     name: string
     ip: string
+    hardwareId: string
     lastConnectedTime: string | null
     status: string
     accessMode?: 'DISCOVERY' | 'STATIC' | 'MANUAL'
