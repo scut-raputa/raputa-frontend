@@ -210,15 +210,15 @@ const barOption = computed(() => ({
       stack: 'total',
       data: barData.value.map((d) => d.dysphagia),
       barMaxWidth: 24,
-      itemStyle: { color: '#5470C6' },
+      itemStyle: { color: '#F59E0B' },
     },
     {
       name: '误吸',
       type: 'bar',
       stack: 'total',
-      data: barData.value.map((d) => d.overt),
+      data: barData.value.map((d) => d.aspiration),
       barMaxWidth: 24,
-      itemStyle: { color: '#EE6666' },
+      itemStyle: { color: '#EF4444' },
     },
   ],
   barCategoryGap: '30%',
@@ -231,14 +231,15 @@ const pieOption = computed(() => ({
     {
       name: '各科室吞咽障碍人群占比',
       type: 'pie',
-      radius: '75%',
+      radius: '66%',
       center: ['50%', '50%'],
       data: pieData.value,
       label: {
         formatter: '{b}\n{c} ({d}%)',
         fontSize: 12,
+        distanceToLabelLine: 10,
       },
-      labelLine: { smooth: true, length: 10, length2: 8 },
+      labelLine: { smooth: true, length: 24, length2: 18 },
       emphasis: {
         itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' },
       },
@@ -258,13 +259,13 @@ const riverOption = computed(() => ({
     formatter: (params: any) => {
       const day = params?.[0]?.axisValueLabel ?? ''
       const lines = params
-        .map((p: any) => `${p.marker} ${p.seriesName}：${p.data} 小时`)
+        .map((p: any) => `${p.marker} ${p.seriesName}：${p.data} 分钟`)
         .join('<br/>')
       const total = params.reduce(
         (s: number, p: any) => s + (Number(p.data) || 0),
         0,
       )
-      return `${day}<br/>${lines}<br/><b>总计：${total.toFixed(1)} 小时</b>`
+      return `${day}<br/>${lines}<br/><b>总计：${total.toFixed(1)} 分钟</b>`
     },
     confine: true,
   },
@@ -277,7 +278,7 @@ const riverOption = computed(() => ({
   },
   yAxis: {
     type: 'value',
-    name: '小时',
+    name: '分钟',
     nameLocation: 'middle',
     nameGap: 40,
     min: 0,
@@ -295,7 +296,7 @@ const riverOption = computed(() => ({
     lineStyle: { width: 0.5, opacity: 0.6 },
     itemStyle: { color: DEVICE_COLORS[i % DEVICE_COLORS.length] },
     emphasis: { focus: 'series' },
-    data: device.usageHours,
+    data: device.usageMinutes,
     z: 1,
   })),
 }))

@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios'
 import type { ApiResponse } from '@/types/response'
+import { clearUser } from '@/utils/auth'
 
 axios.defaults.withCredentials = true
 
@@ -14,6 +15,9 @@ instance.interceptors.response.use(
   (error: AxiosError<any>) => {
     const serverMsg = (error.response?.data as any)?.message
     if (serverMsg) error.message = serverMsg
+    if (error.response?.status === 401) {
+      clearUser()
+    }
 
     return Promise.reject(error)
   },

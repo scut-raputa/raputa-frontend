@@ -20,19 +20,22 @@
 
             <!-- 开始/继续 -->
             <el-tooltip
-              content="给定必填项后才能开始检测"
+              :content="startTooltipContent"
               placement="top"
-              :disabled="canStart === true"
+              :disabled="startTooltipDisabled"
             >
-              <el-button
-                type="primary"
-                size="small"
-                :disabled="!canStart"
-                @click="startDetection"
-              >
-                <el-icon style="margin-right: 4px"><VideoPlay /></el-icon>
-                {{ isInitial ? '开始检测' : '继续检测' }}
-              </el-button>
+              <span class="start-button-wrapper" @click="handleStartButtonClick">
+                <el-button
+                  type="primary"
+                  size="small"
+                  :disabled="!canStart"
+                  :loading="isCheckingInferenceBeforeStart"
+                  @click.stop="startDetection"
+                >
+                  <el-icon v-if="!isCheckingInferenceBeforeStart" style="margin-right: 4px"><VideoPlay /></el-icon>
+                  {{ isInitial ? '开始检测' : '继续检测' }}
+                </el-button>
+              </span>
             </el-tooltip>
 
             <el-tooltip
@@ -82,8 +85,24 @@
             <el-icon><User /></el-icon>
           </template>
         </el-input> -->
+        <!-- 检测任务选择 -->
+        <el-select
+          v-model="selectedTask"
+          placeholder="请选择检测任务"
+          size="small"
+          class="setting-item task-select"
+          @change="onTaskManualChange"
+        >
+          <template #prefix>
+            <el-icon><Operation /></el-icon>
+          </template>
+          <el-option label="吞咽障碍筛查" value="dys" />
+          <el-option label="误吸" value="asp" />
+        </el-select>
+
         <el-select-v2
           v-model="selectedPatientId"
+          class="setting-item subject-select"
           :options="patientOptions"
           :remote="true"
           :loading="patientLoading"
@@ -91,31 +110,31 @@
           size="small"
           filterable
           clearable
-          placeholder="请选择患者"
+          placeholder="请选择患者或预约者"
+          :item-height="64"
+          :height="320"
+          popper-class="subject-select-popper"
           @visible-change="onPatientSelectVisible"
           @clear="() => { patientOptions = []; fetchPatients('') }"
-          style="width: 360px"
         >
           <template #prefix>
             <el-icon><User /></el-icon>
           </template>
-        </el-select-v2>
-
-        <!-- 检测任务选择 -->
-        <el-select
-          v-model="selectedTask"
-          placeholder="请选择任务"
-          size="small"
-          class="setting-item"
-          clearable
-        >
-          <template #prefix>
-            <el-icon><Operation /></el-icon>
+          <template #default="{ item }">
+            <div class="subject-option">
+              <div class="subject-main">
+                <span class="subject-name">{{ item.name }}</span>
+                <el-tag size="small" :type="item.type === 'PATIENT' ? 'success' : 'warning'" effect="plain">
+                  {{ item.type === 'PATIENT' ? '患者' : '预约' }}
+                </el-tag>
+              </div>
+              <div class="subject-sub" :title="`${item.id}${item.dept ? ' / ' + item.dept : ''}`">
+                <span>编号：{{ item.id }}</span>
+                <span v-if="item.dept">{{ item.type === 'APPOINTMENT' ? '预约科室' : '科室' }}：{{ item.dept }}</span>
+              </div>
+            </div>
           </template>
-          <el-option label="吞咽分割" value="seg" />
-          <el-option label="吞咽障碍筛查" value="dys" />
-          <el-option label="误吸检测" value="asp" />
-        </el-select>
+        </el-select-v2>
 
         <!-- 设备仅用于实时模式；文件模式不必选，仍保留控件以便切换 -->
         <el-select-v2
@@ -185,12 +204,23 @@
                   >
                     {{ item.status === 'online' ? '在线' : '离线' }}
                   </el-tag>
+                  <el-tag
+                    v-if="item.occupied"
+                    size="small"
+                    type="danger"
+                    effect="plain"
+                  >
+                    已占用
+                  </el-tag>
                 </div>
                 <span
                   class="device-desc"
                   :class="{ 'desc-offline': item.status === 'offline' }"
                 >
                   <div>MAC: {{ item.mac }}</div>
+                  <div v-if="item.occupied">
+                    占用对象: {{ item.occupiedPatientName || item.occupiedPatientId || '-' }}
+                  </div>
                   <strong>
                     {{ item.desc }}
                   </strong>
@@ -200,7 +230,7 @@
               <el-button
                 size="small"
                 :type="item.status === 'online' ? 'danger' : 'success'"
-                :disabled="isDeviceSelectionFrozen"
+                :disabled="isDeviceSelectionFrozen || item.occupied"
                 @click.stop="toggleDeviceConnection(item)"
               >
                 {{ item.status === 'online' ? '断连' : '连接' }}
@@ -209,6 +239,25 @@
           </template>
         </el-select-v2>
       </div>
+
+      <el-alert
+        v-if="hasPendingScreeningRecord"
+        type="warning"
+        show-icon
+        :closable="false"
+        class="screening-followup"
+      >
+        <template #title>
+          <div class="screening-followup-content">
+            <span>
+              {{ pendingScreeningActionText }}
+            </span>
+            <el-button link type="primary" @click="handlePendingScreeningAction">
+              {{ screeningReportDownloaded ? '建档归档' : '填写并下载报告' }}
+            </el-button>
+          </div>
+        </template>
+      </el-alert>
     </el-card>
 
     <!-- 信号数据卡片 -->
@@ -309,7 +358,7 @@
           <div ref="imuRef" class="echart-container" />
           <el-tooltip
             v-if="isFileMode"
-            content="清空喉运动信号（将删除服务器临时文件）"
+            content="清空喉运动信号（需重新上传后才能检测；已配置的临时文件会同步清理）"
             placement="left"
           >
             <el-button
@@ -328,7 +377,7 @@
           <div ref="gasRef" class="echart-container" />
           <el-tooltip
             v-if="isFileMode"
-            content="清空呼吸信号（将删除服务器临时文件）"
+            content="清空呼吸信号（需重新上传后才能检测；已配置的临时文件会同步清理）"
             placement="left"
           >
             <el-button
@@ -347,7 +396,7 @@
           <div ref="audioRef" class="echart-container" />
           <el-tooltip
             v-if="isFileMode"
-            content="清空声音信号（将删除服务器临时文件）"
+            content="清空声音信号（需重新上传后才能检测）"
             placement="left"
           >
             <el-button
@@ -372,12 +421,107 @@
     :close-on-click-modal="false"
   >
     <div style="display: flex; justify-content: center">
-      <MedicalReport ref="reportRef" :report="reportData" />
+      <component
+        :is="isAppointmentSubject ? ScreeningReport : MedicalReport"
+        ref="reportRef"
+        :report="reportData"
+      />
     </div>
 
     <template #footer>
       <el-button @click="reportDialogVisible = false">取消</el-button>
       <el-button type="primary" @click="downloadReport">下载报告</el-button>
+    </template>
+  </el-dialog>
+
+  <el-dialog
+    v-model="archiveDialogVisible"
+    title="预约者建档归档"
+    width="720px"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
+    <el-alert
+      title="当前对象来自预约筛查。建档成功后，系统会把本次筛查结果归入患者检测记录，并把本次会话文件登记到该患者档案。"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="archive-alert"
+    />
+    <el-form
+      ref="archiveFormRef"
+      :model="archiveForm"
+      :rules="archiveRules"
+      label-width="104px"
+      class="archive-form"
+    >
+      <el-row :gutter="16">
+        <el-col :span="12">
+          <el-form-item label="姓名" prop="name">
+            <el-input v-model="archiveForm.name" disabled />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="性别" prop="gender" required>
+            <el-select v-model="archiveForm.gender" placeholder="请选择性别" disabled style="width: 100%">
+              <el-option label="男" value="男" />
+              <el-option label="女" value="女" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="身份证号码" prop="idCard" required>
+            <el-input v-model="archiveForm.idCard" maxlength="18" placeholder="请输入身份证号码" disabled />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="所在科室" prop="dept">
+            <el-input v-model="archiveForm.dept" placeholder="请输入建档后的所在科室" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="发病日期" prop="onsetDate">
+            <el-date-picker
+              v-model="archiveForm.onsetDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="请选择发病日期"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="病床号" prop="bedNumber">
+            <el-input v-model="archiveForm.bedNumber" placeholder="请输入病床号" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item label="既往史" prop="pastHistory">
+            <el-input
+              v-model="archiveForm.pastHistory"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入既往史"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item label="病程" prop="course">
+            <el-input
+              v-model="archiveForm.course"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入病程"
+            />
+          </el-form-item>
+        </el-col>
+      </el-row>
+    </el-form>
+    <template #footer>
+      <el-button type="primary" :loading="archiveSubmitting" @click="submitScreeningArchive">
+        建档并归档
+      </el-button>
     </template>
   </el-dialog>
 
@@ -544,10 +688,11 @@ import {
 import * as echarts from 'echarts'
 import Papa from 'papaparse'
 import { Download } from '@element-plus/icons-vue'
-import type { CheckboxValueType, UploadFile, FormInstance } from 'element-plus'
+import type { CheckboxValueType, UploadFile, FormInstance, FormRules } from 'element-plus'
 import { ElNotification, ElDialog, ElMessageBox, ElMessage } from 'element-plus'
 import html2pdf from 'html2pdf.js'
 import MedicalReport from '@/components/MedicalReport.vue'
+import ScreeningReport from '@/components/ScreeningReport.vue'
 import { reportData } from '@/mock/ReportData'
 import {
   uploadTempFileApi,
@@ -566,7 +711,18 @@ import { Client, type Frame } from '@stomp/stompjs'
 import { getUser } from '@/utils/auth'
 import type { UserVO } from '@/types/user'
 
-import { listPatients, getPatientById } from '@/api/patient'
+import { createPatient, listPatients, getPatientById, type CreatePatientPayload } from '@/api/patient'
+import { listAppointments } from '@/api/appointment'
+import type { AppointmentRow } from '@/types/appointment'
+import { listDevices } from '@/api/department'
+import type { DeviceRow } from '@/types/department'
+import { getRuntimeSummary } from '@/api/model'
+import type { RuntimeSummary } from '@/types/model'
+import {
+  archiveScreeningRecord,
+  createScreeningRecord,
+  type ScreeningRecordRow,
+} from '@/api/screening'
 
 import { uploadReportPdf } from '@/api/report'
 import {
@@ -576,15 +732,51 @@ import {
 
 import axios from 'axios'
 
-type PatientOption = { value: string; label: string; id: string; name: string }
+type SubjectType = 'PATIENT' | 'APPOINTMENT'
+type PatientOption = {
+  value: string
+  label: string
+  id: string
+  name: string
+  dept?: string
+  gender?: '男' | '女' | null
+  idCard?: string | null
+  age?: number | null
+  phone?: string | null
+  type: SubjectType
+  time?: string
+}
+
+const SUBJECT_PATIENT_PREFIX = 'patient:'
+const SUBJECT_APPOINTMENT_PREFIX = 'appointment:'
+
+function patientSubjectValue(id: string) {
+  return `${SUBJECT_PATIENT_PREFIX}${id}`
+}
+
+function appointmentSubjectValue(id: string) {
+  return `${SUBJECT_APPOINTMENT_PREFIX}${id}`
+}
 
 const patientLoading = ref(false)
 const patientOptions = ref<PatientOption[]>([])
 const selectedPatientId = ref<string>('')
 
+const selectedSubject = computed(() => {
+  return patientOptions.value.find(o => o.value === selectedPatientId.value) ?? null
+})
+
+const isPatientSubject = computed(() => selectedSubject.value?.type === 'PATIENT')
+const isAppointmentSubject = computed(() => selectedSubject.value?.type === 'APPOINTMENT')
+
+const selectedPatientRecordId = computed(() =>
+  isPatientSubject.value ? selectedSubject.value?.id ?? '' : ''
+)
+
+const selectedRuntimeSubjectId = computed(() => selectedSubject.value?.id ?? '')
+
 const selectedPatientName = computed(() => {
-  const hit = patientOptions.value.find(o => o.value === selectedPatientId.value)
-  return hit?.name ?? ''
+  return selectedSubject.value?.name ?? ''
 })
 
 // 当前登录用户（由路由守卫从服务端会话写入内存态）
@@ -599,6 +791,66 @@ const currentDepartmentName = computed(
 // )
 
 const isDownloadingReport = ref(false)
+
+let activeMonitorNotice: ReturnType<typeof ElNotification> | null = null
+
+function defaultNoticeDuration(type: 'success' | 'warning' | 'info' | 'error') {
+  if (type === 'error') return 9000
+  if (type === 'warning') return 7000
+  if (type === 'success') return 3500
+  return 4500
+}
+
+function showMonitorNotice(options: {
+  title: string
+  message: string
+  type?: 'success' | 'warning' | 'info' | 'error'
+  duration?: number
+}) {
+  const type = options.type ?? 'info'
+  const previous = activeMonitorNotice
+  activeMonitorNotice = null
+  previous?.close()
+  const notice = ElNotification({
+    title: options.title,
+    message: options.message,
+    type,
+    duration: options.duration ?? defaultNoticeDuration(type),
+    showClose: true,
+    position: 'top-right',
+    customClass: `monitor-notice monitor-notice-${type}`,
+    onClose: () => {
+      if (activeMonitorNotice === notice) {
+        activeMonitorNotice = null
+      }
+    },
+  })
+  activeMonitorNotice = notice
+}
+
+function showDetectionNotice(options: {
+  title: string
+  message: string
+  type?: 'success' | 'warning' | 'info' | 'error'
+  duration?: number
+}) {
+  showMonitorNotice(options)
+}
+
+function detectionNoticeSummary(
+  totalEvents: number,
+  label: string,
+  count: number,
+  timeList = '',
+) {
+  const summary = `吞咽事件 ${totalEvents} 段，${label} ${count} 段`
+  if (!timeList) return summary
+
+  const ranges = timeList.split('、').filter(Boolean)
+  const visibleRanges = ranges.slice(0, 3).join('、')
+  const suffix = ranges.length > 3 ? ` 等 ${ranges.length} 段` : ''
+  return `${summary}\n时间段：${visibleRanges}${suffix}`
+}
 
 interface PatientDetail {
   id: string
@@ -652,25 +904,55 @@ function mergeById(a: any[], b: any[]) {
   return Array.from(map.values())
 }
 
+function toPatientOption(p: any): PatientOption {
+  return {
+    value: patientSubjectValue(p.id),
+    label: `患者 | ${p.id} - ${p.name}`,
+    id: p.id,
+    name: p.name,
+    dept: p.dept ?? '',
+    type: 'PATIENT',
+  }
+}
+
+function toAppointmentOption(a: AppointmentRow): PatientOption {
+  return {
+    value: appointmentSubjectValue(a.id),
+    label: `预约 | ${a.id} - ${a.name}`,
+    id: a.id,
+    name: a.name,
+    dept: a.dept,
+    gender: a.gender ?? null,
+    idCard: a.idCard ?? null,
+    age: a.age ?? null,
+    phone: a.phone ?? null,
+    time: a.time,
+    type: 'APPOINTMENT',
+  }
+}
+
 const checkRecordsSaved = ref(false)
 
 // === 将本次检测结果写入后台 ===
 // 规则：dys>0 写 DYSPHAGIA；asp>0 写 ASPIRATION；二者均为0时写 NORMAL（仅一条）
 // 注意：后端不需要次数，只有一条纪录/类别；staff 来自报告里的“报告医生”
-async function persistCheckRecords() {
-  const d = realtimeStats.dysphagiaSwallows
-  const a = realtimeStats.aspirationSwallows
-  const patientId = selectedPatientId.value
+async function persistCheckRecords(): Promise<boolean> {
+  if (!isPatientSubject.value) {
+    ElMessage.warning('预约筛查对象需先保存为筛查记录，建档后再归入患者检测记录')
+    return false
+  }
+
+  const patientId = selectedPatientRecordId.value
   const patientName = selectedPatientName.value
   const staff = reportData.value.doctor?.trim() || ''   // ★ 从报告医生读取
 
   if (!patientId || !patientName) {
     ElMessage.error('缺少患者信息，无法写入检测记录')
-    return
+    return false
   }
   if (!staff) {
     ElMessage.error('缺少报告医生(staff)，请先完善报告信息')
-    return
+    return false
   }
 
   const records: Array<{
@@ -681,33 +963,35 @@ async function persistCheckRecords() {
     // checkTime?: string  // 可不传，服务端用上海时区当前时间
   }> = []
 
-  if (d > 0) {
+  const result = currentScreeningResult()
+  if (result === 'DYSPHAGIA') {
     records.push({ patientId, name: patientName, staff, result: 'DYSPHAGIA' })
-  }
-  if (a > 0) {
+  } else if (result === 'ASPIRATION') {
     records.push({ patientId, name: patientName, staff, result: 'ASPIRATION' })
-  }
-  if (d === 0 && a === 0) {
+  } else {
     records.push({ patientId, name: patientName, staff, result: 'NORMAL' })
   }
-  if (records.length === 0) return
+  if (records.length === 0) return true
 
   try {
     await axios.post('/api/check/batch', records)
     checkRecordsSaved.value = true
     ElMessage.success('检测记录已保存')
+    return true
   } catch (err: any) {
     // 后端若没开 batch，也可降级单条提交
     try {
       for (const r of records) await axios.post('/api/check', r)
       checkRecordsSaved.value = true
       ElMessage.success('检测记录已保存')
+      return true
     } catch (e: any) {
-      ElNotification({
+      showMonitorNotice({
         title: '记录保存失败',
         message: e?.message || '请稍后重试',
         type: 'error',
       })
+      return false
     }
   }
 }
@@ -718,39 +1002,43 @@ async function fetchPatients(keyword = '') {
   patientLoading.value = true
   try {
     const base = { page: 1, size: 100 }
+    const apptBase = { page: 1, size: 100 }
 
-    // 空关键字：拉一页最近入院的
+    // 空关键字：拉最近患者 + 今日预约，供系统监测选择筛查对象
     if (!keyword.trim()) {
-      const page = await listPatients(base)
-      const items = page.items ?? []
-      patientOptions.value = items.map((p: any) => ({
-        value: p.id,
-        label: `${p.id} - ${p.name}`,
-        id: p.id,
-        name: p.name,
-      }))
+      const [patientPage, appointmentPage] = await Promise.all([
+        listPatients(base),
+        listAppointments(apptBase),
+      ])
+      const patientItems = patientPage.items ?? []
+      const appointmentItems = appointmentPage.items ?? []
+      patientOptions.value = [
+        ...patientItems.map(toPatientOption),
+        ...appointmentItems.map(toAppointmentOption),
+      ]
       return
     }
 
-    // 非空：并行两次请求（按 id 和按 name）
+    // 非空：患者按 id/name 搜，预约按 id/name 搜
     const kw = keyword.trim()
-    const [byIdPage, byNamePage] = await Promise.all([
+    const [byIdPage, byNamePage, apptByIdPage, apptByNamePage] = await Promise.all([
       listPatients({ ...base, id: kw }),
       listPatients({ ...base, name: kw }),
+      listAppointments({ ...apptBase, id: kw }),
+      listAppointments({ ...apptBase, name: kw }),
     ])
 
     const itemsId = byIdPage.items ?? []
     const itemsName = byNamePage.items ?? []
     const merged = mergeById(itemsId, itemsName)
+    const apptMerged = mergeById(apptByIdPage.items ?? [], apptByNamePage.items ?? [])
 
-    patientOptions.value = merged.map((p: any) => ({
-      value: p.id,
-      label: `${p.id} - ${p.name}`,
-      id: p.id,
-      name: p.name,
-    }))
+    patientOptions.value = [
+      ...merged.map(toPatientOption),
+      ...apptMerged.map(toAppointmentOption),
+    ]
   } catch (e: any) {
-    ElMessage.error(e?.message || '患者列表加载失败')
+    ElMessage.error(e?.message || '筛查对象列表加载失败')
     patientOptions.value = []
   } finally {
     patientLoading.value = false
@@ -763,11 +1051,23 @@ const remotePatientQuery = (q: string) => {
   ;(remotePatientQuery as any)._t = setTimeout(() => fetchPatients(q), 200)
 }
 
+function onTaskManualChange() {
+  taskManuallySelected.value = true
+}
+
 watch(
-  selectedPatientId,
-  (id) => {
-    if (id) {
-      fetchPatientDetailById(id)
+  [selectedPatientId, selectedSubject],
+  ([, subject]) => {
+    if (subject?.type === 'PATIENT') {
+      if (!taskManuallySelected.value) {
+        selectedTask.value = 'asp'
+      }
+      fetchPatientDetailById(subject.id)
+    } else if (subject?.type === 'APPOINTMENT') {
+      if (!taskManuallySelected.value) {
+        selectedTask.value = 'dys'
+      }
+      currentPatient.value = null
     } else {
       currentPatient.value = null
     }
@@ -792,6 +1092,215 @@ const firstSelectedDevice = computed(() => {
 const currentDeviceId = computed(() => firstSelectedDevice.value?.id ?? '')
 // const pickedDeviceIp = computed(() => firstSelectedDevice.value?.ip ?? '')
 // const currentDeviceName = computed(() => firstSelectedDevice.value?.id ?? '')
+
+function getActiveSessionId() {
+  return isFileMode.value ? fileDetectSessionId.value : realtimeSessionId.value
+}
+
+function currentRiskLevel() {
+  return '未分级'
+}
+
+function activeTaskCount() {
+  return selectedTask.value === 'asp'
+    ? realtimeStats.aspirationSwallows
+    : realtimeStats.dysphagiaSwallows
+}
+
+function activeTaskDiagnosis() {
+  const hasFinding = activeTaskCount() > 0
+  if (selectedTask.value === 'asp') {
+    return hasFinding ? '提示存在误吸' : '未提示误吸'
+  }
+  return hasFinding ? '提示存在吞咽障碍' : '未提示吞咽障碍'
+}
+
+function currentScreeningResult(): 'NORMAL' | 'DYSPHAGIA' | 'ASPIRATION' {
+  if (selectedTask.value === 'asp') {
+    return realtimeStats.aspirationSwallows > 0 ? 'ASPIRATION' : 'NORMAL'
+  }
+  if (realtimeStats.dysphagiaSwallows > 0) return 'DYSPHAGIA'
+  return 'NORMAL'
+}
+
+function hasAbnormalScreening() {
+  return currentScreeningResult() !== 'NORMAL'
+}
+
+async function persistScreeningRecord(
+  staff = reportData.value.doctor?.trim() || currentUser.value?.username || '',
+  options: { notify?: boolean } = {},
+): Promise<ScreeningRecordRow | null> {
+  const subject = selectedSubject.value
+  if (!subject || subject.type !== 'APPOINTMENT') {
+    return null
+  }
+  const requestedStaff = String(staff ?? '').trim()
+  if (
+    pendingScreeningRecord.value &&
+    (!requestedStaff || requestedStaff === pendingScreeningRecord.value.staff)
+  ) {
+    return pendingScreeningRecord.value
+  }
+
+  const record = await createScreeningRecord({
+    appointmentId: subject.id,
+    subjectName: subject.name,
+    subjectGender: subject.gender || undefined,
+    subjectAge: appointmentAge(subject) || undefined,
+    subjectIdCard: subject.idCard ? normalizeIdCard(subject.idCard) : undefined,
+    subjectPhone: subject.phone || undefined,
+    subjectDept: subject.dept || currentDepartmentName.value,
+    checkDept: currentDepartmentName.value || undefined,
+    deviceId: currentDeviceId.value || undefined,
+    mode: isFileMode.value ? 'FILE' : 'REALTIME',
+    sessionId: getActiveSessionId() || undefined,
+    result: currentScreeningResult(),
+    riskLevel: currentRiskLevel(),
+    staff: requestedStaff,
+    totalSwallows: realtimeStats.totalSwallows,
+    normalSwallows: Math.max(realtimeStats.totalSwallows - activeTaskCount(), 0),
+    dysphagiaSwallows: selectedTask.value === 'dys' ? realtimeStats.dysphagiaSwallows : 0,
+    aspirationSwallows: selectedTask.value === 'asp' ? realtimeStats.aspirationSwallows : 0,
+    checkTime: new Date().toISOString(),
+  })
+
+  checkRecordsSaved.value = true
+  pendingScreeningRecord.value = record
+  if (options.notify !== false) {
+    ElMessage.success('预约筛查记录已保存')
+  }
+  return record
+}
+
+function openScreeningArchiveDialog(record: ScreeningRecordRow) {
+  if (!screeningReportDownloaded.value || !pendingScreeningPdf.value?.blob) {
+    ElMessage.warning('请先下载筛查报告，确认报告医生后再建档归档')
+    openReportDialog()
+    return
+  }
+
+  pendingScreeningRecord.value = record
+  archiveForm.name = record.subjectName || selectedPatientName.value
+  archiveForm.gender = (record.subjectGender || genderFromIdCard(record.subjectIdCard) || '') as '' | '男' | '女'
+  archiveForm.dept = currentDepartmentName.value || ''
+  archiveForm.idCard = record.subjectIdCard || selectedSubject.value?.idCard || ''
+  archiveForm.onsetDate = getBeijingTimestamp(false)
+  archiveForm.pastHistory = ''
+  archiveForm.bedNumber = '不适用（预约筛查，未住院）'
+  archiveForm.course = ''
+  archiveDialogVisible.value = true
+  nextTick(() => archiveFormRef.value?.clearValidate())
+}
+
+async function maybePromptScreeningArchive(record: ScreeningRecordRow | null) {
+  if (!record || !hasAbnormalScreening() || screeningPromptShown.value) {
+    return
+  }
+  screeningPromptShown.value = true
+  const findingText = selectedTask.value === 'asp' ? '误吸' : '吞咽障碍'
+  if (!screeningReportDownloaded.value) {
+    ElMessage.warning(`本次预约筛查提示存在${findingText}，请先填写并下载报告`)
+    return
+  }
+  ElMessage.warning(`本次预约筛查提示存在${findingText}，请建档并归档本次结果`)
+  openScreeningArchiveDialog(record)
+}
+
+async function finalizeAppointmentScreeningAfterDetection() {
+  if (!isAppointmentSubject.value) {
+    return
+  }
+
+  try {
+    const record = await persistScreeningRecord(undefined, { notify: true })
+    if (record?.status === 'NEEDS_PATIENT_RECORD') {
+      const findingText = selectedTask.value === 'asp' ? '误吸' : '吞咽障碍'
+      ElMessage.warning(`本次预约筛查提示存在${findingText}，请先填写并下载报告`)
+    }
+  } catch (e: any) {
+    showMonitorNotice({
+      title: '筛查记录保存失败',
+      message: e?.message || '本次预约筛查结果未能保存，请稍后重试或联系管理员。',
+      type: 'warning',
+    })
+  }
+}
+
+async function submitScreeningArchive() {
+  const form = archiveFormRef.value
+  if (!form || archiveSubmitting.value) return
+
+  const valid = await form.validate().catch(() => false)
+  if (!valid) return
+
+  const record = pendingScreeningRecord.value
+  if (!record) {
+    ElMessage.error('缺少待归档的筛查记录')
+    return
+  }
+
+  archiveSubmitting.value = true
+  try {
+    const payload: CreatePatientPayload = {
+      name: archiveForm.name.trim(),
+      gender: archiveForm.gender as '男' | '女',
+      dept: archiveForm.dept.trim(),
+      idCard: normalizeIdCard(archiveForm.idCard),
+      onsetDate: archiveForm.onsetDate,
+      pastHistory: archiveForm.pastHistory.trim(),
+      bedNumber: archiveForm.bedNumber.trim(),
+      course: archiveForm.course.trim(),
+    }
+    const patient = await createPatient(payload)
+    await archiveScreeningRecord(record.id, {
+      patientId: patient.id,
+      staff: reportData.value.doctor?.trim() || record.staff || '',
+    })
+
+    const pdf = pendingScreeningPdf.value
+    if (pdf?.blob && pdf.sessionId) {
+      try {
+        await uploadReportPdf(patient.id, patient.name, pdf.sessionId, pdf.blob, pdf.filename)
+      } catch (e: any) {
+        showMonitorNotice({
+          title: '报告登记失败',
+          message: e?.message || '筛查已归档，但 PDF 未写入患者文件，请稍后补录。',
+          type: 'warning',
+        })
+      }
+    }
+
+    const option = toPatientOption(patient)
+    patientOptions.value = [
+      option,
+      ...patientOptions.value.filter(item => item.value !== option.value),
+    ]
+    selectedPatientId.value = option.value
+    currentPatient.value = {
+      id: patient.id,
+      name: patient.name,
+      gender: patient.gender,
+      age: patient.age ?? undefined,
+      outpatientId: (patient as any).outpatientId ?? undefined,
+      dept: patient.dept ?? undefined,
+    }
+
+    archiveDialogVisible.value = false
+    pendingScreeningRecord.value = null
+    pendingScreeningPdf.value = null
+    screeningReportDownloaded.value = false
+    ElMessage.success('已完成建档并归档本次筛查')
+  } catch (e: any) {
+    showMonitorNotice({
+      title: '建档归档失败',
+      message: e?.message || '请检查信息后重试',
+      type: 'error',
+    })
+  } finally {
+    archiveSubmitting.value = false
+  }
+}
 
 const durationShort = 5
 const durationLong = 20 // 吞咽图表显示20秒窗口，避免预测延迟
@@ -841,12 +1350,17 @@ let swallowPlayTimer: number | null = null
 let fileDetectTimer: number | null = null
 let swallowSegments: [number, number][] = [] // 存储吞咽时间段（用于遮罩）
 let aspirationSegments: [number, number][] = [] // 存储误吸时间段（用于红色遮罩）
+type DetectionTask = 'dys' | 'asp'
+type DetectionEventRange = { start: number; end: number }
+let dysphagiaEventRanges: DetectionEventRange[] = []
+let aspirationEventRanges: DetectionEventRange[] = []
 
 // let audioDataBuffer: Float32Array = new Float32Array()
 // const audioUrl = new URL('@/mock/signals/audio.wav', import.meta.url).href
 
 // 控制变量
-const selectedTask = ref('seg') // 默认选择第一个任务
+const selectedTask = ref<DetectionTask | ''>('')
+const taskManuallySelected = ref(false)
 const selectedDevice = ref<string[]>([])
 const isDetecting = ref(false)
 const hasStopped = ref(false)
@@ -854,6 +1368,44 @@ const canReset = ref(false)
 const hasChartStarted = ref(false)
 const realtimeSessionId = ref('')
 const fileDetectSessionId = ref('')
+const INFERENCE_UNAVAILABLE_MESSAGE = '推理服务未启动或不可达'
+const inferenceStatusChecked = ref(false)
+const inferenceAvailable = ref(false)
+const inferenceStatusLoading = ref(false)
+const isCheckingInferenceBeforeStart = ref(false)
+let inferenceStatusTimer: number | null = null
+
+function isRuntimeSummaryAvailable(summary?: RuntimeSummary | null): boolean {
+  return !!(
+    summary?.serviceLive &&
+    summary.serviceReady &&
+    summary.availableModelCount > 0
+  )
+}
+
+async function refreshInferenceStatus(showUnavailableMessage = false): Promise<boolean> {
+  inferenceStatusLoading.value = true
+  try {
+    const summary = await getRuntimeSummary()
+    const available = isRuntimeSummaryAvailable(summary)
+    inferenceAvailable.value = available
+    inferenceStatusChecked.value = true
+    if (!available && showUnavailableMessage) {
+      ElMessage.warning(INFERENCE_UNAVAILABLE_MESSAGE)
+    }
+    return available
+  } catch (error) {
+    console.error('检查推理服务状态失败:', error)
+    inferenceAvailable.value = false
+    inferenceStatusChecked.value = true
+    if (showUnavailableMessage) {
+      ElMessage.warning(INFERENCE_UNAVAILABLE_MESSAGE)
+    }
+    return false
+  } finally {
+    inferenceStatusLoading.value = false
+  }
+}
 
 // 实时检测统计数据
 const realtimeStats = reactive({
@@ -864,8 +1416,139 @@ const realtimeStats = reactive({
   hasDysphagia: false, // 是否有吞咽障碍
 })
 
+function resetRealtimeStats() {
+  realtimeStats.totalSwallows = 0
+  realtimeStats.dysphagiaSwallows = 0
+  realtimeStats.aspirationSwallows = 0
+  realtimeStats.normalSwallows = 0
+  realtimeStats.hasDysphagia = false
+}
+
 const reportDialogVisible = ref(false)
-const reportRef = ref<InstanceType<typeof MedicalReport> | null>(null)
+const reportRef = ref<any>(null)
+
+type ArchivePatientForm = Omit<CreatePatientPayload, 'gender'> & {
+  gender: '' | '男' | '女'
+}
+
+const archiveDialogVisible = ref(false)
+const archiveSubmitting = ref(false)
+const archiveFormRef = ref<FormInstance | null>(null)
+const pendingScreeningRecord = ref<ScreeningRecordRow | null>(null)
+const screeningPromptShown = ref(false)
+const screeningReportDownloaded = ref(false)
+const pendingScreeningPdf = ref<{
+  blob: Blob
+  filename: string
+  sessionId?: string
+} | null>(null)
+
+const archiveForm = reactive<ArchivePatientForm>({
+  name: '',
+  gender: '',
+  dept: '',
+  idCard: '',
+  onsetDate: '',
+  pastHistory: '',
+  bedNumber: '',
+  course: '',
+})
+
+function normalizeIdCard(idCard: string): string {
+  return idCard.trim().toUpperCase()
+}
+
+function isValidMainlandIdCard(idCard: string): boolean {
+  const id = normalizeIdCard(idCard)
+  if (!/^\d{6}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dX]$/.test(id)) {
+    return false
+  }
+
+  const birth = id.slice(6, 14)
+  const y = Number(birth.slice(0, 4))
+  const m = Number(birth.slice(4, 6))
+  const d = Number(birth.slice(6, 8))
+  const date = new Date(y, m - 1, d)
+  if (
+    date.getFullYear() !== y ||
+    date.getMonth() !== m - 1 ||
+    date.getDate() !== d
+  ) {
+    return false
+  }
+
+  const weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+  const checksum = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
+  const sum = weights.reduce((acc, weight, index) => acc + Number(id[index]) * weight, 0)
+  return id[17] === checksum[sum % 11]
+}
+
+function genderFromIdCard(idCard?: string | null): '男' | '女' | null {
+  if (!idCard || !isValidMainlandIdCard(idCard)) return null
+  const seq = Number(normalizeIdCard(idCard)[16])
+  return seq % 2 === 1 ? '男' : '女'
+}
+
+function birthFromIdCard(idCard?: string | null): string | null {
+  if (!idCard || !isValidMainlandIdCard(idCard)) return null
+  const id = normalizeIdCard(idCard)
+  return `${id.slice(6, 10)}-${id.slice(10, 12)}-${id.slice(12, 14)}`
+}
+
+function ageFromBirth(birth?: string | null): number {
+  if (!birth) return 0
+  const [year, month, day] = birth.split('-').map(Number)
+  if (!year || !month || !day) return 0
+  const today = new Date()
+  let age = today.getFullYear() - year
+  const beforeBirthday =
+    today.getMonth() + 1 < month ||
+    (today.getMonth() + 1 === month && today.getDate() < day)
+  if (beforeBirthday) age -= 1
+  return Math.max(age, 0)
+}
+
+function appointmentAge(subject: PatientOption | null): number {
+  if (!subject) return 0
+  if (typeof subject.age === 'number' && subject.age > 0) return subject.age
+  return ageFromBirth(birthFromIdCard(subject.idCard))
+}
+
+const validateArchiveIdCard = (_rule: any, value: string, callback: (error?: Error) => void) => {
+  if (!String(value ?? '').trim()) {
+    callback(new Error('请填写身份证号码'))
+    return
+  }
+  if (!isValidMainlandIdCard(String(value))) {
+    callback(new Error('请输入有效的中国大陆居民身份证号码'))
+    return
+  }
+  callback()
+}
+
+const validateArchiveGender = (_rule: any, value: string, callback: (error?: Error) => void) => {
+  if (!value) {
+    callback(new Error('请选择性别'))
+    return
+  }
+  const inferred = genderFromIdCard(archiveForm.idCard)
+  if (inferred && inferred !== value) {
+    callback(new Error('性别与身份证信息不一致'))
+    return
+  }
+  callback()
+}
+
+const archiveRules: FormRules = {
+  name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
+  gender: [{ validator: validateArchiveGender, trigger: 'change' }],
+  dept: [{ required: true, message: '请填写所在科室', trigger: 'blur' }],
+  idCard: [{ validator: validateArchiveIdCard, trigger: ['blur', 'change'] }],
+  onsetDate: [{ required: true, message: '请选择发病日期', trigger: 'change' }],
+  pastHistory: [{ required: true, message: '请填写既往史', trigger: 'blur' }],
+  bedNumber: [{ required: true, message: '请填写病床号', trigger: 'blur' }],
+  course: [{ required: true, message: '请填写病程', trigger: 'blur' }],
+}
 
 // 上传组件ref
 const imuUploadRef = ref<any>(null)
@@ -878,6 +1561,8 @@ const uploadedFiles = reactive({
   imu: null as File | null,
   gas: null as File | null,
 })
+
+type FileSignalType = 'imu' | 'gas' | 'audio'
 
 // 模式控制状态
 const isFileMode = ref(false) // true=文件模式，false=实时模式
@@ -915,6 +1600,34 @@ const usingIds = () =>
     ) as string[]
   )
 
+function hasImuFileSignal() {
+  return !!uploadedFiles.imu && (
+    imuAxisUsed.value.X ||
+    imuAxisUsed.value.Y ||
+    imuAxisUsed.value.Z
+  )
+}
+
+function hasGasFileSignal() {
+  return !!uploadedFiles.gas && gasSeries.value.length > 0
+}
+
+function hasAudioFileSignal() {
+  return !!uploadedFiles.audio && audioSeries.value.length > 0
+}
+
+function isFilePayloadComplete() {
+  return hasImuFileSignal() && hasGasFileSignal() && hasAudioFileSignal()
+}
+
+function hasAnyFileSignal() {
+  return (
+    hasImuFileSignal() ||
+    hasGasFileSignal() ||
+    hasAudioFileSignal()
+  )
+}
+
 // CSV上传相关状态
 const csvConfigDialogVisible = ref(false)
 const csvPreviewData = ref<any[]>([])
@@ -945,6 +1658,10 @@ type DeviceItem = {
   desc: string
   name?: string
   rtspPath?: string
+  occupied?: boolean
+  occupiedPatientId?: string | null
+  occupiedPatientName?: string | null
+  lockExpiresAt?: string | null
 }
 const deviceList = ref<DeviceItem[]>([
   // {
@@ -1013,7 +1730,7 @@ const deviceOptions = computed(() =>
     .map((d) => ({
       value: d.id,
       label: `${d.id} (${d.ip})`,
-      disabled: d.status !== 'online',
+      disabled: d.status !== 'online' || d.occupied === true,
       ...d,
     }))
 )
@@ -1065,6 +1782,35 @@ function filterDevices(query: string) {
     .replace(/\s+/g, ' ')
     .toLowerCase()
   deviceQuery.value = q
+}
+
+function applyDeviceRegistryState(row: DeviceRow, item: DeviceItem): DeviceItem {
+  return {
+    ...item,
+    id: row.id || item.id,
+    name: row.name || item.name,
+    ip: row.ip || item.ip,
+    rtspPath: row.rtspPath || item.rtspPath,
+    status: row.status === '在线' && row.enabled !== false ? 'online' : 'offline',
+    desc: row.description || item.desc,
+    occupied: row.occupied,
+    occupiedPatientId: row.occupiedPatientId,
+    occupiedPatientName: row.occupiedPatientName,
+    lockExpiresAt: row.lockExpiresAt,
+  }
+}
+
+async function refreshDeviceRegistryState() {
+  try {
+    const page = await listDevices({ page: 1, size: 200 })
+    const rows = page.items ?? []
+    deviceList.value = deviceList.value.map((item) => {
+      const matched = rows.find(row => row.id === item.id || (!!row.ip && row.ip === item.ip))
+      return matched ? applyDeviceRegistryState(matched, item) : item
+    })
+  } catch (e) {
+    console.warn('刷新设备占用状态失败:', e)
+  }
 }
 
 // 处理设备发现
@@ -1128,7 +1874,13 @@ async function handleDeviceDiscovery() {
       ElMessage.success(`发现新设备: ${newDevice.ip}`)
       deviceip.value = newDevice.ip
     }
+
+    await refreshDeviceRegistryState()
   } catch (error: any) {
+    if (error?.response?.status === 401) {
+      ElMessage.warning('登录态校验失败。若刚切换网络，请确认仍使用同一访问地址，或刷新页面后重新登录。')
+      return
+    }
     ElMessage.error(error?.message || '设备发现失败')
   } finally {
     loading.value = false
@@ -1183,34 +1935,46 @@ function getBeijingTimestamp(includeTime = true) {
 
 function openReportDialog() {
   const patient = currentPatient.value
+  const subject = selectedSubject.value
 
   // 🟡 统一用这一刻的时间作为“检测时间”和“检测编号”的时间基准
   const now = new Date()
 
   // 患者基本信息：优先用当前患者详情，没有就退回下拉里的名字/原值
   reportData.value.name =
-    patient?.name || selectedPatientName.value || reportData.value.name
+    patient?.name || subject?.name || selectedPatientName.value || reportData.value.name
 
   reportData.value.gender =
-    (patient?.gender as string | undefined) || reportData.value.gender
+    isPatientSubject.value
+      ? (patient?.gender as string | undefined) || reportData.value.gender
+      : subject?.gender || genderFromIdCard(subject?.idCard) || ''
 
   reportData.value.age =
-    typeof patient?.age === 'number' ? patient!.age : reportData.value.age
+    isPatientSubject.value && typeof patient?.age === 'number'
+      ? patient!.age
+      : appointmentAge(subject)
 
   // 门诊号（不能手填，等后端补到患者详情里；目前先尝试从 patient.outpatientId 读）
   reportData.value.outpatientId =
-    patient?.outpatientId || reportData.value.outpatientId
+    isPatientSubject.value
+      ? patient?.outpatientId || reportData.value.outpatientId
+      : subject?.id || ''
 
-  // 申请科室：优先使用患者档案科室；操作者科室只作为兜底。
-  reportData.value.department = patient?.dept || currentDepartmentName.value
+  // 所在科室：优先使用患者档案科室；操作者科室只作为兜底。
+  reportData.value.department =
+    (isPatientSubject.value ? patient?.dept : currentDepartmentName.value) ||
+    currentDepartmentName.value
+  reportData.value.appointmentDept = isAppointmentSubject.value ? subject?.dept || '' : ''
+  reportData.value.checkDept = currentDepartmentName.value
+  reportData.value.appointmentTime = isAppointmentSubject.value ? subject?.time || '' : ''
 
   // 🟡 检测时间：显示在患者信息栏的“检测时间”
   reportData.value.date = formatDateTime(now)
 
   // 🟡 检测编号：R[patientId][yyyymmddhhmmss]
-  // patientId 优先用 currentPatient.id，其次 selectedPatientId，兜底用 '000000'
+  // patientId 优先用患者档案 ID；预约筛查则使用预约 ID 生成临时报告编号。
   const pid =
-    patient?.id || selectedPatientId.value || reportData.value.outpatientId || '000000'
+    patient?.id || subject?.id || reportData.value.outpatientId || '000000'
 
   const pad2 = (n: number) => String(n).padStart(2, '0')
   const yyyy = now.getFullYear()
@@ -1221,56 +1985,49 @@ function openReportDialog() {
   const ss = pad2(now.getSeconds())
   const ts = `${yyyy}${MM}${dd}${hh}${mm}${ss}`
 
-  reportData.value.reportId = `R${pid}${ts}`
+  reportData.value.reportId = `${isAppointmentSubject.value ? 'S' : 'R'}${pid}${ts}`
 
-  // 检测统计数据
+  // 检测统计数据：报告只展示当前选择任务对应的结论与事件。
+  const task = selectedTask.value || (isAppointmentSubject.value ? 'dys' : 'asp')
+  reportData.value.taskType = task
   reportData.value.totalSwallows = realtimeStats.totalSwallows
-  reportData.value.normalSwallows = realtimeStats.normalSwallows
-  reportData.value.dysphagiaSwallows = realtimeStats.dysphagiaSwallows
-  reportData.value.aspirationSwallows = realtimeStats.aspirationSwallows
-  reportData.value.abnormalSwallows = Math.max(
-    realtimeStats.aspirationSwallows,
-    realtimeStats.dysphagiaSwallows
+  reportData.value.dysphagiaSwallows =
+    task === 'dys' ? realtimeStats.dysphagiaSwallows : 0
+  reportData.value.aspirationSwallows =
+    task === 'asp' ? realtimeStats.aspirationSwallows : 0
+  reportData.value.dysphagiaEvents =
+    task === 'dys' ? [...dysphagiaEventRanges] : []
+  reportData.value.aspirationEvents =
+    task === 'asp' ? [...aspirationEventRanges] : []
+  reportData.value.abnormalSwallows = activeTaskCount()
+  reportData.value.normalSwallows = Math.max(
+    realtimeStats.totalSwallows - activeTaskCount(),
+    0
   )
+  reportData.value.diagnosis = activeTaskDiagnosis()
+  reportData.value.riskLevel = ''
 
-  // 诊断结果
-  reportData.value.diagnosis = realtimeStats.hasDysphagia
-    ? '吞咽障碍患者'
-    : '健康人'
-
-  // 根据误吸次数确定风险等级
-  const aspirationCount = realtimeStats.aspirationSwallows
-  if (aspirationCount === 0) {
-    reportData.value.riskLevel = '低风险'
-  } else if (aspirationCount <= 2) {
-    reportData.value.riskLevel = '中风险'
-  } else {
-    reportData.value.riskLevel = '高风险'
-  }
-
-  // 根据风险等级生成建议措施（保持你原来的逻辑）
   const suggestions: string[] = []
-
-  if (reportData.value.riskLevel === '高风险') {
+  if (task === 'dys') {
     suggestions.push(
-      '1. 建议立即进行进一步的吞咽功能评估',
-      '2. 考虑调整饮食质地，避免稀薄液体',
-      '3. 建议在专业人员指导下进行吞咽康复训练',
-      '4. 必要时考虑使用增稠剂或改变进食姿势'
+      '1. 建议结合床旁评估和临床表现进一步确认吞咽功能状态',
+      '2. 如筛查提示异常，建议完善患者建档并转入诊疗流程',
+      '3. 进食期间注意姿势、速度和食物质地',
+      '4. 如出现咳嗽、清嗓、声音改变或进食困难，请及时处理'
     )
-  } else if (reportData.value.riskLevel === '中风险') {
+  } else if (activeTaskCount() > 0) {
     suggestions.push(
-      '1. 建议进行吞咽功能评估',
-      '2. 注意进食时的姿势和速度',
-      '3. 可考虑进行吞咽康复训练',
-      '4. 定期复查监测吞咽功能变化'
+      '1. 建议由医生结合医嘱和临床表现进一步评估',
+      '2. 进食期间加强观察，必要时调整体位和食物性状',
+      '3. 如多次提示误吸，建议及时处理并复查',
+      '4. 必要时结合进一步检查确认'
     )
   } else {
     suggestions.push(
-      '1. 继续保持良好的进食习惯',
-      '2. 注意进食时避免分心',
-      '3. 如有不适及时就医',
-      '4. 建议定期进行吞咽功能筛查'
+      '1. 本次检测未提示误吸',
+      '2. 建议继续按照医嘱进行观察和护理',
+      '3. 如进食过程中出现异常表现，请及时复查',
+      '4. 必要时结合进一步检查确认'
     )
   }
 
@@ -1315,7 +2072,8 @@ async function downloadReport() {
 
   // === 1.5）前端预警：医生姓名没填写，禁止下载 ===
   if (!doctorName) {
-    ElMessage.warning('请先在报告中填写“报告医生”后再下载')
+    const doctorLabel = selectedTask.value === 'asp' ? '报告医生' : '筛查医生'
+    ElMessage.warning(`请先在报告中填写“${doctorLabel}”后再下载`)
     return
   }
 
@@ -1336,8 +2094,14 @@ async function downloadReport() {
     reportData.value.suggestions = []
   }
 
-  // === 3）先写入检测记录（需要 staff = doctor） ===
-  await persistCheckRecords()
+  // === 3）患者对象直接写患者检测记录；预约对象先写筛查记录 ===
+  if (isPatientSubject.value) {
+    const saved = await persistCheckRecords()
+    if (!saved) {
+      isDownloadingReport.value = false
+      return
+    }
+  }
 
   // === 4）为了导出 PDF，临时把输入框 / 文本域换成纯文本节点 ===
   const doctorInput = content.querySelector(
@@ -1388,7 +2152,9 @@ async function downloadReport() {
     }
   }
 
-  const filename = `吞咽报告_${reportData.value.name}_${getBeijingTimestamp(
+  const reportFilePrefix =
+    selectedTask.value === 'asp' ? '误吸检测报告' : '吞咽障碍筛查报告'
+  const filename = `${reportFilePrefix}_${reportData.value.name}_${getBeijingTimestamp(
     true
   )}.pdf`
 
@@ -1407,32 +2173,50 @@ async function downloadReport() {
     // 5.1 拿到 Blob，上传后端登记 PatientFile（不会触发下载）
     const pdfBlob: Blob = await worker.output('blob')
 
-    const pid = selectedPatientId.value
+    const activeSessionId = getActiveSessionId()
+    let savedScreeningRecord: ScreeningRecordRow | null = null
+
+    if (isAppointmentSubject.value) {
+      try {
+        savedScreeningRecord = await persistScreeningRecord(doctorName)
+        pendingScreeningPdf.value = {
+          blob: pdfBlob,
+          filename,
+          sessionId: activeSessionId || undefined,
+        }
+      } catch (e: any) {
+        showMonitorNotice({
+          title: '筛查记录保存失败',
+          message: e?.message || '本次预约筛查未写入系统，已停止下载报告。',
+          type: 'error',
+        })
+        return
+      }
+    }
+
+    const pid = selectedPatientRecordId.value
     const pname =
       currentPatient.value?.name ||
       selectedPatientName.value ||
       reportData.value.name ||
       ''
-    const activeSessionId = isFileMode.value
-      ? fileDetectSessionId.value
-      : realtimeSessionId.value
 
-    if (!pid) {
-      ElNotification({
+    if (isPatientSubject.value && !pid) {
+      showMonitorNotice({
         title: '提示',
         message: '未选中患者，无法将报告写入患者文件档案，但仍会下载 PDF',
         type: 'warning',
       })
-    } else {
+    } else if (isPatientSubject.value) {
       if (!activeSessionId) {
-        ElNotification({
+        showMonitorNotice({
           title: '报告登记失败',
           message: '当前检测会话缺失，PDF 已下载但无法登记到患者档案。',
           type: 'warning',
         })
       } else {
         uploadReportPdf(pid, pname, activeSessionId, pdfBlob, filename).catch(e => {
-          ElNotification({
+          showMonitorNotice({
             title: '报告登记失败',
             message:
               e?.message ||
@@ -1445,10 +2229,13 @@ async function downloadReport() {
 
     // 5.2 真正触发浏览器下载
     await worker.save()
+    if (isAppointmentSubject.value && savedScreeningRecord) {
+      screeningReportDownloaded.value = true
+    }
 
     // === 5.2.1 实时模式下：下载完成后，把本次会话文件从“临时”转“正式” ===
     // ★ 这里用你上面定义好的 currentDeviceId 和 isFileMode
-    if (!isFileMode.value && (realtimeSessionId.value || currentDeviceId.value)) {
+    if (isPatientSubject.value && !isFileMode.value && (realtimeSessionId.value || currentDeviceId.value)) {
       try {
         await finalizeRealtimeSession({
           sessionId: realtimeSessionId.value || undefined,
@@ -1456,7 +2243,7 @@ async function downloadReport() {
         })
         realtimeSessionId.value = ''
       } catch (e: any) {
-        ElNotification({
+        showMonitorNotice({
           title: '会话文件登记失败',
           message:
             e?.message ||
@@ -1465,6 +2252,8 @@ async function downloadReport() {
         })
       }
     }
+
+    await maybePromptScreeningArchive(savedScreeningRecord)
 
     // 5.3 下载完成后关闭预览弹窗
     reportDialogVisible.value = false
@@ -1482,17 +2271,18 @@ async function downloadReport() {
 }
 
 //==================== 核心可用性：开始按钮条件 ====================
-const canStart = computed(() => {
+const canStartPrerequisites = computed(() => {
   const hasPatient = !!selectedPatientId.value
   if (isFileMode.value) {
     return !!(
       hasPatient &&
       selectedTask.value &&
       filePayloadReady.value &&
+      isFilePayloadComplete() &&
       !isDetecting.value
     )
   }
-  // 实时模式：患者+任务+至少一个设备
+  // 实时模式：筛查对象+任务+至少一个设备
   return !!(
     !isFileMode.value &&
     hasPatient &&
@@ -1503,12 +2293,87 @@ const canStart = computed(() => {
   )
 })
 
+const canStart = computed(
+  () => canStartPrerequisites.value && inferenceAvailable.value && !isCheckingInferenceBeforeStart.value
+)
+
+const startTooltipContent = computed(() => {
+  if (!inferenceStatusChecked.value && inferenceStatusLoading.value) {
+    return '正在检查推理服务状态'
+  }
+  if (!inferenceAvailable.value) {
+    return INFERENCE_UNAVAILABLE_MESSAGE
+  }
+  if (isFileMode.value && selectedPatientId.value && selectedTask.value && !isFilePayloadComplete()) {
+    const missing = [
+      !hasImuFileSignal() ? '三轴信号' : '',
+      !hasGasFileSignal() ? '呼吸信号' : '',
+      !hasAudioFileSignal() ? '音频信号' : '',
+    ].filter(Boolean)
+    return `请重新上传或配置${missing.join('、')}`
+  }
+  if (!canStartPrerequisites.value) {
+    return '给定必填项后才能开始检测'
+  }
+  return ''
+})
+
+const startTooltipDisabled = computed(() => canStart.value)
+
+function handleStartButtonClick() {
+  if (!inferenceAvailable.value) {
+    ElMessage.warning(INFERENCE_UNAVAILABLE_MESSAGE)
+    void refreshInferenceStatus()
+    return
+  }
+  if (isFileMode.value && selectedPatientId.value && selectedTask.value && !isFilePayloadComplete()) {
+    ElMessage.warning(startTooltipContent.value)
+    return
+  }
+  if (!canStartPrerequisites.value) {
+    ElMessage.warning('给定必填项后才能开始检测')
+  }
+}
+
 const hasPendingReport = computed(
   () =>
     !isFileMode.value &&
     hasStopped.value &&
     !checkRecordsSaved.value
 )
+
+const hasPendingScreeningRecord = computed(
+  () => pendingScreeningRecord.value?.status === 'NEEDS_PATIENT_RECORD'
+)
+
+const hasPendingScreeningReport = computed(
+  () => hasPendingScreeningRecord.value && !screeningReportDownloaded.value
+)
+
+const pendingScreeningActionText = computed(() => {
+  const name = pendingScreeningRecord.value?.subjectName || selectedPatientName.value || '当前预约者'
+  if (hasPendingScreeningReport.value) {
+    return `预约筛查对象 ${name} 存在异常，请先填写并下载报告，再建档归档。`
+  }
+  return `预约筛查对象 ${name} 已完成报告下载，请建档后归档本次筛查。`
+})
+
+function handlePendingScreeningAction() {
+  const record = pendingScreeningRecord.value
+  if (!record) return
+  if (hasPendingScreeningReport.value) {
+    openReportDialog()
+    return
+  }
+  openScreeningArchiveDialog(record)
+}
+
+function reopenPendingScreeningArchive() {
+  const record = pendingScreeningRecord.value
+  if (record) {
+    openScreeningArchiveDialog(record)
+  }
+}
 
 //==================== 实时模式相关（保留） ====================
 let totalElapsed = 0
@@ -1537,6 +2402,11 @@ const AXIS_UPDATE_ANIM = {
 } as const
 const AXIS_UPDATE_SETOPTION: echarts.SetOptionOpts = {
   notMerge: true,
+  replaceMerge: ['xAxis', 'yAxis', 'series'],
+  silent: true,
+}
+const SIGNAL_UPDATE_SETOPTION: echarts.SetOptionOpts = {
+  notMerge: false,
   replaceMerge: ['xAxis', 'yAxis', 'series'],
   silent: true,
 }
@@ -1604,8 +2474,14 @@ function readClassOneProbability(item: any): number {
 
 function resetUiInputs() {
   selectedPatientId.value = ''
-  selectedTask.value = 'seg'
+  selectedTask.value = ''
+  taskManuallySelected.value = false
   selectedDevice.value = []
+  pendingScreeningRecord.value = null
+  screeningPromptShown.value = false
+  pendingScreeningPdf.value = null
+  screeningReportDownloaded.value = false
+  archiveDialogVisible.value = false
 }
 
 function resetCsvState() {
@@ -1613,6 +2489,12 @@ function resetCsvState() {
   csvPreviewData.value = []
   csvHeaders.value = []
   rawCsvData.value = []
+  uploadedFiles.audio = null
+  uploadedFiles.imu = null
+  uploadedFiles.gas = null
+  audioUploadRef.value?.clearFiles()
+  imuUploadRef.value?.clearFiles()
+  gasUploadRef.value?.clearFiles()
   csvConfigForm.value = {
     sampleRate: 4000,
     imuAxisMap: { X: '', Y: '', Z: '' },
@@ -1622,6 +2504,65 @@ function resetCsvState() {
   imuAxisUsed.value = { X: false, Y: false, Z: false }
   filePayloadReady.value = false
   currentSignalType.value = 'imu'
+}
+
+function clearFileDetectionOutcome() {
+  if (swallowPlayTimer != null) {
+    clearInterval(swallowPlayTimer)
+    swallowPlayTimer = null
+  }
+  if (fileDetectTimer != null) {
+    clearTimeout(fileDetectTimer)
+    fileDetectTimer = null
+  }
+
+  dysphagiaRealtimeSeries = []
+  aspirationRealtimeSeries = []
+  dysphagiaDisplaySeries = []
+  aspirationDisplaySeries = []
+  swallowPlaybackRows = []
+  swallowSegments = []
+  aspirationSegments = []
+  dysphagiaEventRanges = []
+  aspirationEventRanges = []
+  fileDetectSessionId.value = ''
+  checkRecordsSaved.value = false
+  hasStopped.value = false
+  isInitial.value = true
+  resetRealtimeStats()
+
+  activeMonitorNotice?.close()
+  activeMonitorNotice = null
+
+  if (swallowChart) {
+    const base = createSwallowOptionFile([], [])
+    swallowChart.setOption(
+      { ...base, dataZoom: [{ ...INSIDE_ZOOM }] },
+      { notMerge: true }
+    )
+  }
+}
+
+function clearUploadFileForSignal(signalType: FileSignalType) {
+  if (signalType === 'imu') {
+    uploadedFiles.imu = null
+    imuUploadRef.value?.clearFiles()
+  } else if (signalType === 'gas') {
+    uploadedFiles.gas = null
+    gasUploadRef.value?.clearFiles()
+  } else {
+    uploadedFiles.audio = null
+    audioUploadRef.value?.clearFiles()
+  }
+}
+
+function invalidateFilePayloadAfterSourceChange(signalType?: FileSignalType) {
+  filePayloadReady.value = false
+  if (signalType) {
+    clearUploadFileForSignal(signalType)
+  }
+  clearFileDetectionOutcome()
+  canReset.value = hasAnyFileSignal()
 }
 
 // 获取配置对话框标题
@@ -1642,21 +2583,19 @@ function validateColumnCount(
 
   if (signalType === 'imu') {
     if (columnCount !== 4) {
-      ElNotification({
+      showMonitorNotice({
         title: '文件格式错误',
-        message: `IMU信号文件应包含4列数据（时间戳 + X、Y、Z轴），当前文件包含${columnCount}列，请重新选择正确的文件`,
+        message: `IMU 文件需要 4 列：时间戳、X、Y、Z。\n当前检测到 ${columnCount} 列，请重新选择文件。`,
         type: 'error',
-        duration: 5000,
       })
       return false
     }
   } else if (signalType === 'gas') {
     if (columnCount !== 2) {
-      ElNotification({
+      showMonitorNotice({
         title: '文件格式错误',
-        message: `鼻气流信号文件应包含2列数据（时间戳 + 气流值），当前文件包含${columnCount}列，请重新选择正确的文件`,
+        message: `鼻气流文件需要 2 列：时间戳、气流值。\n当前检测到 ${columnCount} 列，请重新选择文件。`,
         type: 'error',
-        duration: 5000,
       })
       return false
     }
@@ -1729,6 +2668,8 @@ function resetChartAndData() {
   swallowPlaybackRows = []
   swallowSegments = []
   aspirationSegments = []
+  dysphagiaEventRanges = []
+  aspirationEventRanges = []
 
   // imuIdx = 0
   // gasIdx = 0
@@ -1741,15 +2682,14 @@ function resetChartAndData() {
   isInitial.value = true
   reportDialogVisible.value = false
   checkRecordsSaved.value = false
+  pendingScreeningRecord.value = null
+  pendingScreeningPdf.value = null
+  screeningReportDownloaded.value = false
+  screeningPromptShown.value = false
   realtimeSessionId.value = ''
   fileDetectSessionId.value = ''
 
-  // 重置实时统计数据
-  realtimeStats.totalSwallows = 0
-  realtimeStats.dysphagiaSwallows = 0
-  realtimeStats.aspirationSwallows = 0
-  realtimeStats.normalSwallows = 0
-  realtimeStats.hasDysphagia = false
+  resetRealtimeStats()
 
   renderEmptyCharts()
 }
@@ -1769,6 +2709,7 @@ function createImuXYZOption(
   end: number
 ): echarts.EChartsOption {
   return {
+    animation: false,
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
     legend: {
       data: ['喉运动信号 X', '喉运动信号 Y', '喉运动信号 Z'],
@@ -1827,7 +2768,7 @@ async function showDeviceOccupiedDialog(result: RealtimeConnectResult) {
   const occupation = result.occupation
   const lines = [
     `设备编号：${occupation?.deviceId || result.deviceId || '-'}`,
-    `占用患者：${occupation?.patientName || '-'}（${occupation?.patientId || '-'}）`,
+    `占用对象：${occupation?.patientName || '-'}（${occupation?.patientId || '-'}）`,
     `开始时间：${formatOccupationStartedAt(occupation?.startedAt)}`,
     `原因：${occupation?.reason || result.reason || '设备正在使用中'}`,
   ]
@@ -1840,6 +2781,20 @@ async function showDeviceOccupiedDialog(result: RealtimeConnectResult) {
 }
 
 async function startDetection() {
+  if (!canStartPrerequisites.value) {
+    ElMessage.warning('给定必填项后才能开始检测')
+    return
+  }
+
+  if (isCheckingInferenceBeforeStart.value) return
+  isCheckingInferenceBeforeStart.value = true
+  try {
+    const available = await refreshInferenceStatus(true)
+    if (!available) return
+  } finally {
+    isCheckingInferenceBeforeStart.value = false
+  }
+
   reportData.value.date = formatDateTime(new Date())
   hasStopped.value = false
   canReset.value = false
@@ -1899,12 +2854,18 @@ async function startDetection() {
       primaryIp, // 设备IP
       primaryId, // 设备ID
       device.name || primaryId,
-      selectedPatientId.value, // 患者编号
-      selectedPatientName.value // 患者姓名
+      selectedRuntimeSubjectId.value, // 患者编号或预约编号
+      selectedPatientName.value // 患者姓名或预约者姓名
     )
 
     if (connectResult.occupied) {
       realtimeSessionId.value = ''
+      const target = deviceList.value.find(d => d.id === primaryId)
+      if (target) {
+        target.occupied = true
+        target.occupiedPatientId = connectResult.occupation?.patientId || null
+        target.occupiedPatientName = connectResult.occupation?.patientName || null
+      }
       await showDeviceOccupiedDialog(connectResult)
       return
     }
@@ -1985,12 +2946,21 @@ async function stopDetection() {
       const primaryId = selectedDevice.value?.[0] || ''
       if (primaryId) {
         await disconnectRealtimeDevice(primaryId)
+        const target = deviceList.value.find(d => d.id === primaryId)
+        if (target) {
+          target.occupied = false
+          target.occupiedPatientId = null
+          target.occupiedPatientName = null
+        }
       }
+      refreshDeviceRegistryState()
       // ElMessage.success(`设备已断开连接,文件已保存至:${csvPath}`)
     } catch (error: any) {
       console.error('断开设备失败:', error)
     }
   }
+
+  await finalizeAppointmentScreeningAfterDetection()
 }
 
 function resetDetection() {
@@ -2626,6 +3596,7 @@ function frame(now: number = performance.now()) {
   // 实时模式: 禁用动画,固定坐标轴范围
   imuChart.setOption(
     {
+      animation: false,
       tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
       legend: {
         data: ['喉运动信号 X', '喉运动信号 Y', '喉运动信号 Z'],
@@ -2665,11 +3636,12 @@ function frame(now: number = performance.now()) {
         },
       ],
     },
-    { notMerge: false, replaceMerge: ['series'], silent: true }
+    SIGNAL_UPDATE_SETOPTION
   )
   // GAS 图表: 禁用动画,固定坐标轴范围,Y轴以0为中心
   gasChart.setOption(
     {
+      animation: false,
       tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
       legend: { data: ['呼吸信号'], top: 8, itemGap: 4 },
       grid: SIGNAL_GRID,
@@ -2687,10 +3659,11 @@ function frame(now: number = performance.now()) {
         },
       ],
     },
-    { notMerge: false, replaceMerge: ['series'], silent: true }
+    SIGNAL_UPDATE_SETOPTION
   )
   audioChart.setOption(
     {
+      animation: false,
       tooltip: {
         trigger: 'axis',
         axisPointer: {
@@ -2722,7 +3695,7 @@ function frame(now: number = performance.now()) {
         },
       ],
     },
-    { notMerge: false, replaceMerge: ['series'], silent: true }
+    SIGNAL_UPDATE_SETOPTION
   )
   swallowChart.setOption(
     {
@@ -2742,7 +3715,8 @@ function frame(now: number = performance.now()) {
 
 //==================== 文件模式：“检测”模拟 ====================
 async function startFileModeDetection() {
-  if (!filePayloadReady.value) {
+  if (!filePayloadReady.value || !isFilePayloadComplete()) {
+    filePayloadReady.value = false
     ElMessage.warning('请先上传所有信号文件')
     return
   }
@@ -2757,10 +3731,10 @@ async function startFileModeDetection() {
   ElMessage.info('正在上传文件并进行检测，请稍后…')
 
   try {
-    const patientId = selectedPatientId.value
+    const patientId = selectedRuntimeSubjectId.value
     const patientName = selectedPatientName.value || currentPatient.value?.name || ''
     if (!patientId) {
-      ElMessage.error('请选择患者后再进行文件检测')
+      ElMessage.error('请选择患者或预约者后再进行文件检测')
       isDetecting.value = false
       return
     }
@@ -2780,7 +3754,8 @@ async function startFileModeDetection() {
 
     // 检查是否检测到吞咽事件
     if (result.message) {
-      ElNotification({
+      resetRealtimeStats()
+      showDetectionNotice({
         title: '检测完成',
         message: result.message,
         type: 'warning',
@@ -2789,6 +3764,7 @@ async function startFileModeDetection() {
       isDetecting.value = false
       hasStopped.value = true
       canReset.value = true
+      await finalizeAppointmentScreeningAfterDetection()
       return
     }
 
@@ -2891,10 +3867,13 @@ async function startFileModeDetection() {
 
       // 显示检测结果和危险提示
       const totalEvents = result.swallow_events.length
+      let dysphagiaCount = 0
 
       // 统计误吸段并收集时间段
       const aspirationEvents: { time: string; label: string }[] = []
       aspirationSegments = [] // 重置误吸段
+      aspirationEventRanges = []
+      dysphagiaEventRanges = []
 
       if (result.aspiration) {
         result.aspiration.forEach((asp, idx) => {
@@ -2906,24 +3885,49 @@ async function startFileModeDetection() {
             })
             // 收集误吸时间段用于遮罩
             aspirationSegments.push([start, end])
+            aspirationEventRanges.push({ start, end })
           }
         })
       }
 
+      if (result.dysphagia) {
+        result.dysphagia.forEach((dys, idx) => {
+          if (dys.predicted_class === 1 && events[idx]) {
+            const [start, end] = events[idx]
+            dysphagiaCount++
+            dysphagiaEventRanges.push({ start, end })
+          }
+        })
+      }
+
+      realtimeStats.totalSwallows = totalEvents
+      realtimeStats.aspirationSwallows = aspirationEvents.length
+      realtimeStats.dysphagiaSwallows = dysphagiaCount
+      realtimeStats.hasDysphagia = dysphagiaCount > 0
+      realtimeStats.normalSwallows = Math.max(
+        totalEvents - Math.max(aspirationEvents.length, dysphagiaCount),
+        0
+      )
+
       // 显示检测结果
-      if (aspirationEvents.length > 0) {
+      if (selectedTask.value === 'asp' && aspirationEvents.length > 0) {
         const timeList = aspirationEvents.map((e) => e.time).join('、')
-        ElNotification({
-          title: '⚠️ 危险提示',
-          message: `检测到 ${totalEvents} 段吞咽事件，其中 ${aspirationEvents.length} 段存在误吸风险！\n时间段：${timeList}`,
+        showDetectionNotice({
+          title: '危险提示',
+          message: detectionNoticeSummary(totalEvents, '误吸提示', aspirationEvents.length, timeList),
           type: 'error',
-          duration: 0, // 不自动关闭
-          showClose: true,
+          duration: 10000,
+        })
+      } else if (selectedTask.value === 'dys' && dysphagiaCount > 0) {
+        showDetectionNotice({
+          title: '筛查提示',
+          message: detectionNoticeSummary(totalEvents, '吞咽障碍', dysphagiaCount),
+          type: 'warning',
+          duration: 8000,
         })
       } else {
-        ElMessage.success(
-          `✅检测完成！共检测到 ${totalEvents} 个吞咽事件，未发现误吸风险`
-        )
+        const negativeText = selectedTask.value === 'asp' ? '未提示误吸' : '未提示吞咽障碍'
+        ElMessage.success(`检测完成：共检测到 ${totalEvents} 个吞咽事件，${negativeText}`)
       }
 
       // 打印检测结果到控制台（用于调试）
@@ -2935,7 +3939,8 @@ async function startFileModeDetection() {
         console.log('误吸检测:', result.aspiration)
       }
     } else {
-      ElNotification({
+      resetRealtimeStats()
+      showDetectionNotice({
         title: '检测完成',
         message: '未检测到吞咽事件',
         type: 'info',
@@ -2946,9 +3951,10 @@ async function startFileModeDetection() {
     isDetecting.value = false
     hasStopped.value = true
     canReset.value = true
+    await finalizeAppointmentScreeningAfterDetection()
   } catch (error: any) {
     console.error('检测失败:', error)
-    ElNotification({
+    showDetectionNotice({
       title: '检测失败',
       message: error?.message || '检测过程中发生错误，请重试',
       type: 'error',
@@ -3163,7 +4169,8 @@ function handleRealtimeAudioData(data: {
   }
 
   // 计算相对时间(秒) - 相对于开始接收数据的时间
-  const relativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
+  const rawRelativeTimeSec = (data.timestamp - realtimeBaseTimestamp) / 1000
+  const relativeTimeSec = normalizeRealtimeTime(audioSeries.value, rawRelativeTimeSec)
 
   // 添加到AUDIO序列中
   audioSeries.value.push([relativeTimeSec, data.amplitude])
@@ -3181,7 +4188,7 @@ function handleRealtimePredictionResult(result: any) {
 
   // 检查是否有错误消息
   if (result.message) {
-    ElNotification({
+    showDetectionNotice({
       title: '预测结果',
       message: result.message,
       type: 'info',
@@ -3239,15 +4246,18 @@ function handleRealtimePredictionResult(result: any) {
             time: `${start.toFixed(1)}s - ${end.toFixed(1)}s`,
             label: asp.label,
           })
+          aspirationEventRanges.push({ start, end })
         }
       })
     }
 
     // 统计吞咽障碍
     if (result.dysphagia) {
-      result.dysphagia.forEach((dys: any) => {
-        if (dys.predicted_class === 1) {
+      result.dysphagia.forEach((dys: any, idx: number) => {
+        if (dys.predicted_class === 1 && events[idx]) {
+          const [start, end] = events[idx]
           dysphagiaCount++
+          dysphagiaEventRanges.push({ start, end })
         }
       })
     }
@@ -3328,14 +4338,13 @@ function handleRealtimePredictionResult(result: any) {
     console.log('最后几个点:', dysphagiaRealtimeSeries.slice(-5))
 
     // 显示通知
-    if (aspirationCount > 0) {
+    if (selectedTask.value === 'asp' && aspirationCount > 0) {
       const timeList = aspirationEvents.map((e) => e.time).join('、')
-      ElNotification({
-        title: '⚠️ 危险提示',
-        message: `实时检测: 发现 ${totalEvents} 段吞咽事件，其中 ${aspirationCount} 段存在误吸风险！\n时间段：${timeList}`,
+      showDetectionNotice({
+        title: '危险提示',
+        message: detectionNoticeSummary(totalEvents, '误吸提示', aspirationCount, timeList),
         type: 'error',
         duration: 8000,
-        showClose: true,
       })
 
       // 显示风险提示
@@ -3345,10 +4354,18 @@ function handleRealtimePredictionResult(result: any) {
       //     .map((asp: any) => asp.probabilitys[1] || 0)
       // )
       // showRiskAlert(maxRisk)
+    } else if (selectedTask.value === 'dys' && dysphagiaCount > 0) {
+      showDetectionNotice({
+        title: '筛查提示',
+        message: detectionNoticeSummary(totalEvents, '吞咽障碍', dysphagiaCount),
+        type: 'warning',
+        duration: 8000,
+      })
     } else {
-      ElNotification({
+      const negativeText = selectedTask.value === 'asp' ? '未提示误吸' : '未提示吞咽障碍'
+      showDetectionNotice({
         title: '预测结果',
-        message: `实时检测: 发现 ${totalEvents} 段吞咽事件，未发现误吸风险`,
+        message: `吞咽事件：${totalEvents} 段；${negativeText}`,
         type: 'success',
         duration: 3000,
       })
@@ -3357,8 +4374,8 @@ function handleRealtimePredictionResult(result: any) {
 }
 
 const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-  if (hasPendingReport.value) {
-    // 有未导出的报告 ⇒ 阻止默认并提示
+  if (hasPendingReport.value || hasPendingScreeningRecord.value) {
+    // 有未完成的报告/预约筛查归档 ⇒ 阻止默认并提示
     e.preventDefault()
     // 大多数浏览器会忽略自定义文案，但必须设置 returnValue 才会弹出确认框
     e.returnValue = ''
@@ -3372,6 +4389,11 @@ onMounted(() => {
     initCharts()
     hasChartStarted.value = true
   }
+
+  void refreshInferenceStatus()
+  inferenceStatusTimer = window.setInterval(() => {
+    void refreshInferenceStatus()
+  }, 10000)
 
   // 初始状态不加载设备，等用户点击下拉框时再发现设备
   loading.value = false
@@ -3402,7 +4424,7 @@ async function maybeDeleteServerFile(id: string | null) {
   const still = usingIds()
   if (still.has(id)) {
     // 仍被其他信号使用 ⇒ 不删
-    ElNotification({
+    showMonitorNotice({
       title: '提示',
       message: '该 CSV 仍被其他信号使用，仅清空当前图表',
       type: 'info',
@@ -3413,7 +4435,7 @@ async function maybeDeleteServerFile(id: string | null) {
     await deleteTempFileApi(id)
     allTempIds.value.delete(id)
   } catch (e: any) {
-    ElNotification({
+    showMonitorNotice({
       title: '删除失败',
       message: e?.message || '删除临时文件失败',
       type: 'warning',
@@ -3453,7 +4475,7 @@ const handleCsvSelect = async (file: UploadFile, signalType: 'imu' | 'gas') => {
   if (!raw) return
   const isCsv = raw.type === 'text/csv' || /\.csv$/i.test(raw.name)
   if (!isCsv) {
-    ElNotification({
+    showMonitorNotice({
       title: '格式错误',
       message: '请上传 CSV 格式的文件',
       type: 'error',
@@ -3530,7 +4552,7 @@ const handleAudioSelect = async (file: UploadFile) => {
     raw.type === 'audio/x-wav' ||
     /\.wav$/i.test(raw.name)
   if (!isWav) {
-    ElNotification({
+    showMonitorNotice({
       title: '格式错误',
       message: '请上传 WAV 格式的音频文件',
       type: 'error',
@@ -3568,6 +4590,9 @@ const handleAudioSelect = async (file: UploadFile) => {
 
     // 保存原始文件（用于发送到检测接口）
     uploadedFiles.audio = raw
+    filePayloadReady.value = false
+    clearFileDetectionOutcome()
+    canReset.value = hasAnyFileSignal()
 
     // 渲染音频图表
     renderFileModeCharts()
@@ -3582,7 +4607,7 @@ const handleAudioSelect = async (file: UploadFile) => {
     checkAllSignalsReady()
   } catch (error: any) {
     console.error('音频文件解析失败:', error)
-    ElNotification({
+    showMonitorNotice({
       title: '音频解析失败',
       message: error?.message || '无法解析音频文件，请确保文件格式正确',
       type: 'error',
@@ -3595,13 +4620,11 @@ const handleAudioSelect = async (file: UploadFile) => {
 
 // 检查所有信号是否都已就绪
 function checkAllSignalsReady() {
-  const hasImu =
-    imuSeries.X.length > 0 || imuSeries.Y.length > 0 || imuSeries.Z.length > 0
-  const hasGas = gasSeries.value.length > 0
-  const hasAudio = audioSeries.value.length > 0
+  const wasReady = filePayloadReady.value
+  const ready = isFilePayloadComplete()
+  filePayloadReady.value = ready
 
-  if (hasImu && hasGas && hasAudio) {
-    filePayloadReady.value = true
+  if (ready && !wasReady) {
     ElMessage.success('所有信号已配置完成，可以开始检测')
   }
 }
@@ -3610,6 +4633,9 @@ const submitCsvConfig = async () => {
   if (!csvConfigFormRef.value) return
   const valid = await csvConfigFormRef.value.validate()
   if (!valid) return
+
+  filePayloadReady.value = false
+  clearFileDetectionOutcome()
 
   // const { sampleRate, imuAxisMap, gasCol, audioCol } = csvConfigForm.value
   const { sampleRate, imuAxisMap, gasCol } = csvConfigForm.value
@@ -3808,12 +4834,19 @@ function renderAspirationMasks() {
 
 // 清空图表数据（文件模式下会删除服务器临时文件并清空全部数据）
 const clearChartData = async (chartType: 'imu' | 'gas' | 'audio') => {
+  if (isDetecting.value) {
+    ElMessage.warning('检测过程中请先停止检测，再清空信号数据')
+    return
+  }
+
   const label =
     chartType === 'imu' ? '喉运动' : chartType === 'gas' ? '呼吸' : '声音'
   try {
-    await ElMessageBox.confirm(`确定要清空${label}信号数据吗？`, '确认清空', {
-      type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      `确定要清空${label}信号数据吗？清空后本次文件检测结果会失效，需要重新上传该信号后才能继续检测。`,
+      '确认清空',
+      { type: 'warning' }
+    )
   } catch {
     return
   }
@@ -3832,6 +4865,7 @@ const clearChartData = async (chartType: 'imu' | 'gas' | 'audio') => {
     imuAxisUsed.value = { X: false, Y: false, Z: false }
 
     owner.imu.X = owner.imu.Y = owner.imu.Z = null
+    invalidateFilePayloadAfterSourceChange('imu')
 
     // 对每个可能的 id 尝试“按引用删除”
     for (const id of idsToCheck) await maybeDeleteServerFile(id)
@@ -3839,11 +4873,13 @@ const clearChartData = async (chartType: 'imu' | 'gas' | 'audio') => {
     const id = owner.gas
     gasSeries.value = []
     owner.gas = null
+    invalidateFilePayloadAfterSourceChange('gas')
     await maybeDeleteServerFile(id)
   } else {
     const id = owner.audio
     audioSeries.value = []
     owner.audio = null
+    invalidateFilePayloadAfterSourceChange('audio')
     await maybeDeleteServerFile(id)
   }
 
@@ -3888,12 +4924,38 @@ watch(isFileMode, async (newVal, oldVal) => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  if (inferenceStatusTimer !== null) {
+    window.clearInterval(inferenceStatusTimer)
+    inferenceStatusTimer = null
+  }
   disconnectWebSocket()
 })
 
 onBeforeRouteLeave((to, from, next) => {
   void to
   void from
+  if (hasPendingScreeningRecord.value) {
+    const message = hasPendingScreeningReport.value
+      ? '当前预约筛查结果尚未导出报告。请先填写报告医生并下载报告，再完成建档归档，否则本次筛查会话文件无法安全归入患者档案。'
+      : '当前预约筛查结果尚未完成建档归档。请先完成建档并归档后再离开本页，否则本次筛查会话文件无法安全归入患者档案。'
+    ElMessageBox.alert(
+      message,
+      hasPendingScreeningReport.value ? '请先下载报告' : '请先建档归档',
+      {
+        type: 'warning',
+        confirmButtonText: hasPendingScreeningReport.value ? '去下载报告' : '继续建档',
+      }
+    ).finally(() => {
+      if (hasPendingScreeningReport.value) {
+        openReportDialog()
+      } else {
+        reopenPendingScreeningArchive()
+      }
+    })
+    next(false)
+    return
+  }
+
   if (hasPendingReport.value) {
     ElMessageBox.confirm(
       '当前检测已停止但尚未导出报告，离开本页将导致本次检测记录无法写入系统。是否仍然离开？',
@@ -3943,6 +5005,88 @@ onBeforeRouteLeave((to, from, next) => {
   font-size: 1.2rem;
   font-weight: 600;
 }
+
+.subject-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  width: 100%;
+  height: 64px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  line-height: 1.2;
+}
+
+.subject-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.subject-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.subject-sub {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #5f6b7a;
+  font-size: 12px;
+}
+
+.subject-sub span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subject-sub span:first-child {
+  flex: 0 0 auto;
+}
+
+.subject-sub span:last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+:global(.subject-select-popper .el-select-dropdown__item) {
+  height: 64px;
+  padding: 0;
+  line-height: normal;
+}
+
+:global(.subject-select-popper .el-select-dropdown__item > span) {
+  width: 100%;
+}
+
+.archive-alert {
+  margin-bottom: 16px;
+}
+
+.archive-form {
+  padding-top: 4px;
+}
+
+.screening-followup {
+  margin-top: 12px;
+}
+
+.screening-followup-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
 :deep(.el-card__header) {
   padding: 6px 0px;
 }
@@ -3950,6 +5094,10 @@ onBeforeRouteLeave((to, from, next) => {
   align-self: stretch;
   height: auto;
   margin: 0 6px;
+}
+
+.start-button-wrapper {
+  display: inline-flex;
 }
 
 .setting-row {
@@ -3962,6 +5110,15 @@ onBeforeRouteLeave((to, from, next) => {
   flex: 1 1 0;
   min-width: 0;
 }
+
+.subject-select {
+  flex: 1 1 0;
+}
+
+.task-select {
+  flex: 0 0 160px;
+}
+
 .setting-button {
   width: 80px;
 }
@@ -4000,7 +5157,7 @@ onBeforeRouteLeave((to, from, next) => {
 }
 
 .device-select {
-  flex: 2 1 0;
+  flex: 1 1 0;
   min-width: 0;
 }
 .device-option-row {
@@ -4189,5 +5346,53 @@ onBeforeRouteLeave((to, from, next) => {
 .risk-low {
   background-color: #1890ff !important;
   border-left: 6px solid #003a8c !important;
+}
+
+.monitor-notice {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+}
+
+.monitor-notice .el-notification__group {
+  min-width: 0;
+}
+
+.monitor-notice .el-notification__title {
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.monitor-notice .el-notification__content {
+  margin-top: 6px;
+  color: #4b5563;
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.monitor-notice .el-notification__closeBtn {
+  top: 16px;
+}
+
+.monitor-notice-error {
+  border-left: 5px solid #ef4444;
+}
+
+.monitor-notice-warning {
+  border-left: 5px solid #f59e0b;
+}
+
+.monitor-notice-success {
+  border-left: 5px solid #22c55e;
+}
+
+.monitor-notice-info {
+  border-left: 5px solid #3b82f6;
 }
 </style>

@@ -151,7 +151,7 @@ const actionItems = [
 const policyItems = [
   { label: '患者隐私展示', value: '列表隐藏身份证，使用出生日期展示' },
   { label: '身份证校验', value: '前后端校验大陆身份证，校对性别' },
-  { label: '报告申请科室', value: '优先取患者档案科室' },
+  { label: '报告所在科室', value: '优先取患者档案科室' },
   { label: '设备识别策略', value: '硬件标识优先，IP 仅作当前地址' },
   { label: '会话保存方式', value: 'HttpOnly Cookie，前端不保存 token' },
   { label: '系统配置持久化', value: '待接入后端配置表后开放保存' },

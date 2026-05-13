@@ -9,13 +9,13 @@ export const lineData = [
 ]
 
 export const barData = [
-  { category: '周日', normal: 18, dysphagia: 5, overt: 1, silent: 1 },
-  { category: '周一', normal: 26, dysphagia: 10, overt: 2, silent: 2 },
-  { category: '周二', normal: 16, dysphagia: 6, overt: 1, silent: 1 },
-  { category: '周三', normal: 8, dysphagia: 3, overt: 1, silent: 0 },
-  { category: '周四', normal: 15, dysphagia: 6, overt: 1, silent: 1 },
-  { category: '周五', normal: 19, dysphagia: 6, overt: 1, silent: 1 },
-  { category: '周六', normal: 24, dysphagia: 9, overt: 2, silent: 2 },
+  { category: '周日', normal: 18, dysphagia: 5, aspiration: 2 },
+  { category: '周一', normal: 26, dysphagia: 10, aspiration: 4 },
+  { category: '周二', normal: 16, dysphagia: 6, aspiration: 2 },
+  { category: '周三', normal: 8, dysphagia: 3, aspiration: 1 },
+  { category: '周四', normal: 15, dysphagia: 6, aspiration: 2 },
+  { category: '周五', normal: 19, dysphagia: 6, aspiration: 2 },
+  { category: '周六', normal: 24, dysphagia: 9, aspiration: 4 },
 ]
 
 export const pieData = [
@@ -28,12 +28,12 @@ export const pieData = [
 ]
 
 // export const deptBreakdownData = [
-//   { name: '呼吸科', dysphagia: 13, overt: 9, silent: 6 }, // 13+9+6 = 28
-//   { name: '肿瘤科', dysphagia: 9, overt: 5, silent: 4 }, // 18
-//   { name: '康复科', dysphagia: 8, overt: 5, silent: 4 }, // 17
-//   { name: '脑外科', dysphagia: 5, overt: 3, silent: 3 }, // 11
-//   { name: '神经内科', dysphagia: 5, overt: 3, silent: 3 }, // 11
-//   { name: '普通外科', dysphagia: 7, overt: 4, silent: 4 }, // 15
+//   { name: '呼吸科', dysphagia: 13, aspiration: 15 },
+//   { name: '肿瘤科', dysphagia: 9, aspiration: 9 },
+//   { name: '康复科', dysphagia: 8, aspiration: 9 },
+//   { name: '脑外科', dysphagia: 5, aspiration: 6 },
+//   { name: '神经内科', dysphagia: 5, aspiration: 6 },
+//   { name: '普通外科', dysphagia: 7, aspiration: 8 },
 // ]
 
 export interface Patient {

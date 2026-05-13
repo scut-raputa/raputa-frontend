@@ -11,8 +11,7 @@ export interface DailyCheckResult {
   category: string      
   normal: number       
   dysphagia: number     
-  overt: number         
-  silent: number        
+  aspiration: number    
 }
 
 export interface DeptPatientCount {
@@ -22,7 +21,7 @@ export interface DeptPatientCount {
 
 export interface DeviceUsage {
   deviceId: string        
-  usageHours: number[]    
+  usageMinutes: number[]  
 }
 
 export interface StatsResponse {

@@ -20,7 +20,7 @@
           />
           <el-input
             v-model="apptSearchName"
-            placeholder="搜索患者"
+            placeholder="搜索预约者"
             size="small"
             clearable
             style="width: 180px"
@@ -53,28 +53,50 @@
           stripe
           border
           size="small"
-          class="table"
+          class="table appointment-table"
           style="margin-bottom: 16px"
           :row-class-name="apptRowClassName"
           :row-style="row35Style"
           :cell-style="cell35Style"
         >
-          <el-table-column prop="id" label="就诊编号" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="name" label="患者姓名" min-width="70" show-overflow-tooltip />
-          <el-table-column prop="dept" label="预约科室" min-width="90" show-overflow-tooltip />
-          <el-table-column prop="time" label="预约时间" width="100" />
-          <el-table-column label="操作" width="130">
+          <el-table-column prop="id" label="就诊编号" width="166" show-overflow-tooltip />
+          <el-table-column label="姓名" width="86">
             <template #default="{ row }">
               <template v-if="!row.__filler">
-                <el-button size="small" @click="() => onOpenEditAppt(row)"
-                  >编辑</el-button
-                >
-                <el-button
-                  size="small"
-                  type="danger"
-                  @click="() => onDeleteAppt(row)"
-                  >删除</el-button
-                >
+                <div class="appointment-name-cell">
+                  <el-tooltip
+                    :content="row.phone ? `联系电话：${row.phone}` : '未登记联系电话'"
+                    placement="top"
+                  >
+                    <el-icon
+                      class="appointment-phone-icon"
+                      :class="{ 'is-empty': !row.phone }"
+                    >
+                      <Phone />
+                    </el-icon>
+                  </el-tooltip>
+                  <span class="appointment-name-text">{{ row.name }}</span>
+                </div>
+              </template>
+            </template>
+          </el-table-column>
+          <el-table-column prop="dept" label="预约科室" width="82" show-overflow-tooltip />
+          <el-table-column prop="time" label="预约时间" width="102" />
+          <el-table-column label="操作" width="122">
+            <template #default="{ row }">
+              <template v-if="!row.__filler">
+                <div class="appointment-actions">
+                  <el-button size="small" @click="() => onOpenEditAppt(row)">
+                    编辑
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="danger"
+                    @click="() => onDeleteAppt(row)"
+                  >
+                    删除
+                  </el-button>
+                </div>
               </template>
             </template>
           </el-table-column>
@@ -97,7 +119,7 @@
         <el-dialog
           v-model="createApptVisible"
           title="新增预约"
-          width="520px"
+          width="620px"
           :close-on-click-modal="false"
         >
           <el-form
@@ -114,15 +136,47 @@
               />
             </el-form-item>
 
-            <el-form-item label="科室" prop="dept">
+            <el-form-item label="性别" prop="gender" required>
+              <el-select
+                v-model="createApptForm.gender"
+                placeholder="请选择"
+                :validate-event="false"
+                style="width: 100%"
+              >
+                <el-option label="男" value="男" />
+                <el-option label="女" value="女" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="身份证号码" prop="idCard" required>
               <el-input
-                v-model="createApptForm.dept"
-                placeholder="请输入科室"
+                v-model="createApptForm.idCard"
+                placeholder="请输入身份证号码"
+                maxlength="18"
+                :validate-event="false"
+              />
+              <div v-if="createApptIdCardMeta" class="id-card-meta">
+                出生日期：{{ createApptIdCardMeta.birth }} / 性别：{{ createApptIdCardMeta.gender }}
+              </div>
+            </el-form-item>
+
+            <el-form-item label="联系电话" prop="phone">
+              <el-input
+                v-model="createApptForm.phone"
+                placeholder="请输入联系电话"
                 :validate-event="false"
               />
             </el-form-item>
 
-            <el-form-item label="预约时间" prop="time">
+            <el-form-item label="预约科室" prop="dept">
+              <el-input
+                v-model="createApptForm.dept"
+                placeholder="请输入预约科室"
+                :validate-event="false"
+              />
+            </el-form-item>
+
+            <el-form-item label="预约时间" prop="time" required>
               <el-date-picker
                 v-model="createApptForm.time"
                 type="date"
@@ -151,7 +205,7 @@
         <el-dialog
           v-model="editApptVisible"
           title="编辑预约信息"
-          width="520px"
+          width="620px"
           :close-on-click-modal="false"
         >
           <el-form
@@ -163,20 +217,55 @@
             <el-form-item label="姓名" prop="name">
               <el-input
                 v-model="editApptForm.name"
-                placeholder="请输入姓名"
+                disabled
+                placeholder="姓名预约后不可修改"
                 :validate-event="false"
               />
             </el-form-item>
 
-            <el-form-item label="科室" prop="dept">
+            <el-form-item label="性别" prop="gender">
+              <el-select
+                v-model="editApptForm.gender"
+                disabled
+                placeholder="请选择"
+                :validate-event="false"
+                style="width: 100%"
+              >
+                <el-option label="男" value="男" />
+                <el-option label="女" value="女" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="身份证号码" prop="idCard">
+              <el-input
+                v-model="editApptForm.idCard"
+                disabled
+                placeholder="身份证号码预约后不可修改"
+                maxlength="18"
+                :validate-event="false"
+              />
+              <div v-if="editApptIdCardMeta" class="id-card-meta">
+                出生日期：{{ editApptIdCardMeta.birth }} / 性别：{{ editApptIdCardMeta.gender }}
+              </div>
+            </el-form-item>
+
+            <el-form-item label="联系电话" prop="phone">
+              <el-input
+                v-model="editApptForm.phone"
+                placeholder="请输入联系电话"
+                :validate-event="false"
+              />
+            </el-form-item>
+
+            <el-form-item label="预约科室" prop="dept">
               <el-input
                 v-model="editApptForm.dept"
-                placeholder="请输入科室"
+                placeholder="请输入预约科室"
                 :validate-event="false"
               />
             </el-form-item>
 
-            <el-form-item label="预约时间" prop="time">
+            <el-form-item label="预约时间" prop="time" required>
               <el-date-picker
                 v-model="editApptForm.time"
                 type="date"
@@ -279,18 +368,23 @@
           <el-table-column prop="id" label="患者编号" min-width="120" show-overflow-tooltip />
           <el-table-column prop="name" label="患者姓名" min-width="90" show-overflow-tooltip />
           <el-table-column prop="staff" label="检测者" min-width="90" show-overflow-tooltip />
-          <el-table-column label="检测结果" min-width="90">
+          <el-table-column label="检测结果" min-width="96">
             <template #default="{ row }">
               <el-tag
-                :type="resultTagType(row.result)"
+                :type="resultTagType(normalizeCheckResult(row.result))"
+                :class="['check-result-tag', resultTagClass(normalizeCheckResult(row.result))]"
                 effect="light"
                 size="small"
               >
-                {{ row.result }}
+                {{ normalizeCheckResult(row.result) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="date" label="检测日期" width="120" />
+          <el-table-column prop="date" label="检测日期" width="150" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="nowrap-cell">{{ row.date }}</span>
+            </template>
+          </el-table-column>
         </el-table>
 
         <div class="pagination-wrapper">
@@ -408,27 +502,27 @@
           stripe
           border
           size="small"
-          class="table"
+          class="table patient-main-table"
           style="margin-bottom: 16px"
           :row-class-name="patientRowClassName"
           :row-style="row35Style"
           :cell-style="cell35Style"
         >
-          <el-table-column prop="id" label="患者编号" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="name" label="姓名" min-width="80" show-overflow-tooltip />
-          <el-table-column prop="gender" label="性别" min-width="50" />
-          <el-table-column label="科室" min-width="110" show-overflow-tooltip>
+          <el-table-column prop="id" label="患者编号" width="116" show-overflow-tooltip />
+          <el-table-column prop="name" label="姓名" width="74" show-overflow-tooltip />
+          <el-table-column prop="gender" label="性别" width="52" />
+          <el-table-column label="科室" min-width="90" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.dept ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="出生日期" min-width="100">
+          <el-table-column label="出生日期" width="96">
             <template #default="{ row }">
               {{ patientBirthLabel(row) }}
             </template>
           </el-table-column>
-          <el-table-column prop="admit" label="入院日期" min-width="100" />
-          <el-table-column label="是否检测" min-width="70">
+          <el-table-column prop="admit" label="入院日期" width="96" />
+          <el-table-column label="是否检测" width="76">
             <template #default="{ row }">
               <el-tag
                 :type="checkedTagType(checkedLabel(row.checked))"
@@ -439,38 +533,41 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="发病日期" min-width="100">
+          <el-table-column label="发病日期" width="96">
             <template #default="{ row }">
               {{ row.onsetDate ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="既往史" min-width="100" show-overflow-tooltip>
+          <el-table-column label="既往史" min-width="104" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.pastHistory ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="病床号" min-width="90" show-overflow-tooltip>
+          <el-table-column label="病床号" width="76" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.bedNumber ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="病程" min-width="150" show-overflow-tooltip>
+          <el-table-column label="病程" min-width="128" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.course ?? '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="130">
+          <el-table-column label="操作" width="122">
             <template #default="{ row }">
               <template v-if="!row.__filler">
-                <el-button size="small" @click="() => onOpenEdit(row)"
-                  >编辑</el-button
-                >
-                <el-button
-                  size="small"
-                  type="danger"
-                  @click="() => onDelete(row)"
-                  >删除</el-button
-                >
+                <div class="patient-row-actions">
+                  <el-button size="small" @click="() => onOpenEdit(row)">
+                    编辑
+                  </el-button>
+                  <el-button
+                    size="small"
+                    type="danger"
+                    @click="() => onDelete(row)"
+                  >
+                    删除
+                  </el-button>
+                </div>
               </template>
             </template>
           </el-table-column>
@@ -508,7 +605,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="性别" prop="gender">
+            <el-form-item label="性别" prop="gender" required>
               <el-select
                 v-model="createForm.gender"
                 placeholder="请选择"
@@ -527,7 +624,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="身份证号码" prop="idCard">
+            <el-form-item label="身份证号码" prop="idCard" required>
               <el-input
                 v-model="createForm.idCard"
                 placeholder="请输入身份证号码"
@@ -610,7 +707,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="性别" prop="gender">
+            <el-form-item label="性别" prop="gender" required>
               <el-select
                 v-model="editForm.gender"
                 disabled
@@ -630,7 +727,7 @@
               />
             </el-form-item>
 
-            <el-form-item label="身份证号码" prop="idCard">
+            <el-form-item label="身份证号码" prop="idCard" required>
               <el-input
                 v-model="editForm.idCard"
                 disabled
@@ -706,6 +803,7 @@ import {
   Plus,
   Filter,
   CircleCheck,
+  Phone,
 } from '@element-plus/icons-vue'
 import { listAppointments, createAppointment, updateAppointment, deleteAppointment } from '@/api/appointment'
 import type { AppointmentRow } from '@/types/appointment'
@@ -902,26 +1000,56 @@ const createApptRef = ref<FormInstance>()
 
 const createApptForm = reactive({
   name: '',
+  gender: '' as '' | '男' | '女',
+  idCard: '',
+  phone: '',
   dept: '',
   time: '',
 })
 
 const createApptRules: FormRules = {
   name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
-  dept: [{ required: true, message: '请填写科室', trigger: 'blur' }],
+  gender: [
+    {
+      validator: (_rule, value, callback) =>
+        validateGenderWithIdCard(String(value ?? ''), createApptForm.idCard, callback),
+      trigger: 'change',
+    },
+  ],
+  idCard: [{ validator: validateMainlandIdCard, trigger: ['blur', 'change'] }],
+  phone: [{ max: 32, message: '联系电话长度不能超过32个字符', trigger: 'blur' }],
+  dept: [{ required: true, message: '请填写预约科室', trigger: 'blur' }],
   time: [{ validator: validateApptDateFutureOrToday, trigger: 'change' }],
 }
 
 const validateApptFieldSilently = (
-  prop: 'name' | 'dept' | 'time',
+  prop: 'name' | 'gender' | 'idCard' | 'phone' | 'dept' | 'time',
 ) => {
   createApptRef.value?.validateField(prop, () => {})
 }
 const validateApptDebounced = debounce(validateApptFieldSilently, 200)
+const createApptIdCardMeta = computed(() => idCardMeta(createApptForm.idCard))
 
 watch(
   () => createApptForm.name,
   () => validateApptDebounced('name'),
+)
+watch(
+  () => createApptForm.gender,
+  () => validateApptDebounced('gender'),
+)
+watch(
+  () => createApptForm.idCard,
+  (value) => {
+    const inferred = genderFromIdCard(value)
+    if (inferred) createApptForm.gender = inferred
+    validateApptDebounced('idCard')
+    validateApptDebounced('gender')
+  },
+)
+watch(
+  () => createApptForm.phone,
+  () => validateApptDebounced('phone'),
 )
 watch(
   () => createApptForm.dept,
@@ -935,6 +1063,9 @@ watch(
 function resetCreateApptForm() {
   Object.assign(createApptForm, {
     name: '',
+    gender: '',
+    idCard: '',
+    phone: '',
     dept: '',
     time: '',
   })
@@ -954,6 +1085,9 @@ async function onCreateApptSubmit() {
   try {
     const payload = {
       name: createApptForm.name.trim(),
+      gender: createApptForm.gender as '男' | '女',
+      idCard: normalizeIdCard(createApptForm.idCard),
+      phone: createApptForm.phone.trim() || undefined,
       dept: createApptForm.dept.trim(),
       time: createApptForm.time,
     }
@@ -985,26 +1119,30 @@ const editApptRef = ref<FormInstance>()
 const editApptForm = reactive({
   id: '',
   name: '',
+  gender: '' as '' | '男' | '女',
+  idCard: '',
+  phone: '',
   dept: '',
   time: '',
 })
 
 const editApptRules: FormRules = {
-  name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
-  dept: [{ required: true, message: '请填写科室', trigger: 'blur' }],
+  phone: [{ max: 32, message: '联系电话长度不能超过32个字符', trigger: 'blur' }],
+  dept: [{ required: true, message: '请填写预约科室', trigger: 'blur' }],
   time: [{ validator: validateApptDateFutureOrToday, trigger: 'change' }],
 }
 
 const validateEditApptFieldSilently = (
-  prop: 'name' | 'dept' | 'time',
+  prop: 'phone' | 'dept' | 'time',
 ) => {
   editApptRef.value?.validateField(prop, () => {})
 }
 const validateEditApptDebounced = debounce(validateEditApptFieldSilently, 200)
+const editApptIdCardMeta = computed(() => idCardMeta(editApptForm.idCard))
 
 watch(
-  () => editApptForm.name,
-  () => validateEditApptDebounced('name'),
+  () => editApptForm.phone,
+  () => validateEditApptDebounced('phone'),
 )
 watch(
   () => editApptForm.dept,
@@ -1018,6 +1156,9 @@ watch(
 function onOpenEditAppt(row: AppointmentRow) {
   editApptForm.id = row.id
   editApptForm.name = row.name ?? ''
+  editApptForm.gender = (row.gender ?? '') as '' | '男' | '女'
+  editApptForm.idCard = row.idCard ?? ''
+  editApptForm.phone = row.phone ?? ''
   editApptForm.dept = row.dept ?? ''
   editApptForm.time = row.time ?? ''
   editApptVisible.value = true
@@ -1031,7 +1172,7 @@ async function onEditApptSubmit() {
   editApptSubmitting.value = true
   try {
     await updateAppointment(editApptForm.id, {
-      name: editApptForm.name.trim(),
+      phone: editApptForm.phone.trim() || undefined,
       dept: editApptForm.dept.trim(),
       time: editApptForm.time,
     })
@@ -1075,19 +1216,30 @@ async function onDeleteAppt(row: AppointmentRow) {
 
 type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
 const CHECK_RESULT_OPTIONS: CheckResult[] = [
-  '吞咽障碍',
-  '显性误吸',
-  '隐性误吸',
   '正常',
+  '吞咽障碍',
+  '误吸',
 ]
+
+function normalizeCheckResult(result: unknown): CheckResult {
+  if (result === '误吸') return '误吸'
+  if (result === '吞咽障碍') return '吞咽障碍'
+  return '正常'
+}
+
 const resultTagType = (r: CheckResult): TagType => {
   const map: Record<CheckResult, TagType> = {
-    吞咽障碍: 'info',
-    显性误吸: 'warning',
-    隐性误吸: 'danger',
     正常: 'success',
+    吞咽障碍: 'warning',
+    误吸: 'danger',
   }
   return map[r] ?? 'info'
+}
+const resultTagClass = (r: CheckResult) => {
+  if (r === '正常') return 'result-normal'
+  if (r === '吞咽障碍') return 'result-dysphagia'
+  if (r === '误吸') return 'result-aspiration'
+  return ''
 }
 const checkPage = ref(1)
 const checkSelectedDate = ref<Date | null>(null)
@@ -1648,6 +1800,10 @@ function cell35Style() {
 .table {
   width: 100%;
 }
+.appointment-table :deep(.cell) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
 .pagination-wrapper {
   display: flex;
   justify-content: center;
@@ -1686,12 +1842,82 @@ function cell35Style() {
 .icon-with-margin {
   margin-right: 4px;
 }
+.appointment-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.appointment-phone-icon {
+  flex: 0 0 auto;
+  color: #409eff;
+  cursor: help;
+}
+.appointment-phone-icon.is-empty {
+  color: #c0c4cc;
+}
+.appointment-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.appointment-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.appointment-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+.patient-main-table :deep(.cell) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.patient-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.patient-row-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
 .id-card-meta {
   width: 100%;
   margin-top: 6px;
   color: #606266;
   font-size: 12px;
   line-height: 1.4;
+}
+.nowrap-cell {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.check-result-tag {
+  min-width: 56px;
+  justify-content: center;
+  font-weight: 600;
+}
+.result-dysphagia {
+  --el-tag-bg-color: #fffbeb;
+  --el-tag-border-color: #f59e0b;
+  --el-tag-text-color: #b45309;
+}
+.result-aspiration {
+  --el-tag-bg-color: #fef2f2;
+  --el-tag-border-color: #ef4444;
+  --el-tag-text-color: #b91c1c;
+}
+.result-normal {
+  --el-tag-bg-color: #ecfdf5;
+  --el-tag-border-color: #10b981;
+  --el-tag-text-color: #047857;
 }
 :deep(.el-table__body tr.is-filler .cell) {
   visibility: hidden;

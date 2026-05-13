@@ -77,7 +77,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="responsible" label="负责人" min-width="100" show-overflow-tooltip />
-          <el-table-column label="操作" width="270" fixed="right">
+          <el-table-column label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <template v-if="!row.__filler">
                 <el-button size="small" :type="row.status === '在线' ? 'primary' : 'default'"

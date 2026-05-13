@@ -202,10 +202,22 @@
                     </div>
 
                     <!-- 日期下的多个时间段（精确到秒） -->
-                    <div v-for="(slot, sIdx) in group.slots" :key="sIdx" class="time-slot">
-                      <div class="time-slot-title">时间：{{ slot.time }}</div>
-                      <div class="file-grid">
+                    <div
+                      v-for="(slot, sIdx) in group.slots"
+                      :key="sIdx"
+                      class="time-slot"
+                    >
+                      <div class="time-slot-title">
+                        <span class="tree-branch">
+                          {{ sIdx === group.slots.length - 1 ? '└──' : '├──' }}
+                        </span>
+                        <span>时间：{{ slot.time }}</span>
+                      </div>
+                      <div class="file-list">
                         <div v-for="(file, i) in slot.files" :key="i" class="file-cell">
+                          <span class="tree-branch file-branch">
+                            {{ i === slot.files.length - 1 ? '└──' : '├──' }}
+                          </span>
                           <el-tooltip :content="file.name" placement="top" effect="dark" :show-after="300">
                             <span class="file-name">{{ file.name }}</span>
                           </el-tooltip>
@@ -652,20 +664,14 @@ async function onExportAll() {
   min-width: 80px;
 }
 
-.file-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px 16px;
-}
-
 .file-cell {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
-  padding: 6px 10px;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  background-color: #fafafa;
+  gap: 6px;
+  padding: 3px 0;
+  border: none;
+  background-color: transparent;
   min-width: 0;
 }
 
@@ -717,29 +723,67 @@ async function onExportAll() {
 .file-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .file-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .file-date-label {
-  font-weight: 500;
-  color: #666;
+  display: flex;
+  align-items: center;
+  height: 24px;
+  font-weight: 600;
+  color: #4b5563;
   font-size: 14px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .file-date-icon {
-  margin-right: 6px;
-  vertical-align: middle;
+  margin-right: 8px;
+  flex-shrink: 0;
 }
 
-.time-slot { margin: 6px 0 10px 8px; }
-.time-slot-title { color: #666; font-size: 13px; margin: 4px 0; }
+.time-slot {
+  margin: 0 0 10px 0;
+  padding-left: 20px;
+}
+
+.time-slot-title {
+  display: flex;
+  align-items: center;
+  color: #5f6b7a;
+  font-size: 13px;
+  margin: 0 0 4px 0;
+  line-height: 24px;
+}
+
+.tree-branch {
+  flex: 0 0 34px;
+  width: 34px;
+  color: #9aa3af;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  letter-spacing: 0;
+  white-space: pre;
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 34px;
+}
+
+.file-branch {
+  color: #c0c4cc;
+}
+
+.file-cell :deep(.el-button) {
+  padding: 0 2px;
+}
 @media (max-width: 1200px) {
   .console-filter-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));

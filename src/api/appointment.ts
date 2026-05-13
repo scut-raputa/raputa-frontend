@@ -9,16 +9,20 @@ export interface AppointmentQuery {
   name?: string
   dept?: string
   date?: string
+  status?: 'PENDING' | 'COMPLETED' | 'ALL' | string
 }
 
 export interface CreateAppointmentPayload {
   name: string
+  gender: '男' | '女'
+  idCard: string
+  phone?: string
   dept: string
   time: string
 }
 
 export interface UpdateAppointmentPayload {
-  name: string
+  phone?: string
   dept: string
   time: string
 }
