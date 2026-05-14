@@ -23,6 +23,8 @@ export interface AspirationResult {
 export interface DetectionResponse {
   sessionId?: string
   status?: string
+  predictionWindowSeconds?: number
+  prediction_window_seconds?: number
   swallowEvents?: number[][]
   swallow_events?: number[][]  // 吞咽事件时间段 [[start, end], ...]
   dysphagia?: DysphagiaResult[]  // 吞咽障碍检测结果

@@ -18,57 +18,59 @@
 
             <el-divider direction="vertical" class="header-divider" />
 
-            <!-- 开始/继续 -->
-            <el-tooltip
-              :content="startTooltipContent"
-              placement="top"
-              :disabled="startTooltipDisabled"
-            >
-              <span class="start-button-wrapper" @click="handleStartButtonClick">
+            <div class="action-button-group">
+              <!-- 开始/继续 -->
+              <el-tooltip
+                :content="startTooltipContent"
+                placement="top"
+                :disabled="startTooltipDisabled"
+              >
+                <span class="start-button-wrapper" @click="handleStartButtonClick">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :disabled="!canStart"
+                    :loading="isCheckingInferenceBeforeStart"
+                    @click.stop="startDetection"
+                  >
+                    <el-icon v-if="!isCheckingInferenceBeforeStart" style="margin-right: 4px"><VideoPlay /></el-icon>
+                    {{ startButtonText }}
+                  </el-button>
+                </span>
+              </el-tooltip>
+
+              <el-tooltip
+                content="仅在检测过程中启用"
+                placement="top"
+                :disabled="isDetecting"
+              >
                 <el-button
-                  type="primary"
+                  type="danger"
                   size="small"
-                  :disabled="!canStart"
-                  :loading="isCheckingInferenceBeforeStart"
-                  @click.stop="startDetection"
+                  :disabled="!isDetecting"
+                  @click="stopDetection"
                 >
-                  <el-icon v-if="!isCheckingInferenceBeforeStart" style="margin-right: 4px"><VideoPlay /></el-icon>
-                  {{ isInitial ? '开始检测' : '继续检测' }}
+                  <el-icon style="margin-right: 4px"><VideoPause /></el-icon>
+                  停止检测
                 </el-button>
-              </span>
-            </el-tooltip>
+              </el-tooltip>
 
-            <el-tooltip
-              content="仅在检测过程中启用"
-              placement="top"
-              :disabled="isDetecting"
-            >
-              <el-button
-                type="danger"
-                size="small"
-                :disabled="!isDetecting"
-                @click="stopDetection"
+              <el-tooltip
+                content="检测停止后才能复位"
+                placement="top"
+                :disabled="canReset"
               >
-                <el-icon style="margin-right: 4px"><VideoPause /></el-icon>
-                停止检测
-              </el-button>
-            </el-tooltip>
-
-            <el-tooltip
-              content="检测停止后才能复位"
-              placement="top"
-              :disabled="canReset"
-            >
-              <el-button
-                type="warning"
-                size="small"
-                :disabled="!canReset"
-                @click="resetDetection"
-              >
-                <el-icon style="margin-right: 4px"><Refresh /></el-icon>
-                复位
-              </el-button>
-            </el-tooltip>
+                <el-button
+                  type="warning"
+                  size="small"
+                  :disabled="!canReset"
+                  @click="resetDetection"
+                >
+                  <el-icon style="margin-right: 4px"><Refresh /></el-icon>
+                  复位
+                </el-button>
+              </el-tooltip>
+            </div>
           </div>
         </div>
       </template>
@@ -325,6 +327,48 @@
                 </el-button>
               </el-tooltip>
             </el-upload>
+
+            <div v-if="!isFileMode" class="segmentation-mode-control">
+              <span>自动分割吞咽段</span>
+              <el-switch
+                v-model="manualSegmentationEnabled"
+                size="small"
+                :disabled="isDetecting && manualSwallowActive"
+                @change="handleSegmentationModeChange"
+              />
+              <span>手动分割吞咽段</span>
+            </div>
+
+            <el-divider
+              v-if="!isFileMode"
+              direction="vertical"
+              class="chart-header-divider"
+            />
+
+            <el-tooltip
+              v-if="!isFileMode"
+              :content="manualSwallowTooltip"
+              placement="top"
+              :disabled="canUseManualSwallowButton"
+            >
+              <span class="manual-swallow-wrapper">
+                <el-button
+                  type="primary"
+                  size="small"
+                  plain
+                  :disabled="!canUseManualSwallowButton"
+                  @click="handleManualSwallowClick"
+                >
+                  {{ manualSwallowButtonText }}
+                </el-button>
+              </span>
+            </el-tooltip>
+
+            <el-divider
+              v-if="!isFileMode"
+              direction="vertical"
+              class="chart-header-divider"
+            />
 
             <!-- 检测报告下载（仍仅实时模式） -->
             <el-tooltip
@@ -727,6 +771,8 @@ import {
 import { uploadReportPdf } from '@/api/report'
 import {
   finalizeRealtimeSession,
+  setRealtimeSegmentationMode,
+  submitManualSwallowSegment,
   type RealtimeConnectResult,
 } from '@/api/realtime'
 
@@ -2272,6 +2318,10 @@ async function downloadReport() {
 
 //==================== 核心可用性：开始按钮条件 ====================
 const canStartPrerequisites = computed(() => {
+  if (hasStopped.value) {
+    return false
+  }
+
   const hasPatient = !!selectedPatientId.value
   if (isFileMode.value) {
     return !!(
@@ -2297,12 +2347,24 @@ const canStart = computed(
   () => canStartPrerequisites.value && inferenceAvailable.value && !isCheckingInferenceBeforeStart.value
 )
 
+const startButtonText = computed(() =>
+  isInitial.value || hasStopped.value ? '开始检测' : '继续检测'
+)
+
 const startTooltipContent = computed(() => {
   if (!inferenceStatusChecked.value && inferenceStatusLoading.value) {
     return '正在检查推理服务状态'
   }
   if (!inferenceAvailable.value) {
     return INFERENCE_UNAVAILABLE_MESSAGE
+  }
+  if (isDetecting.value) {
+    return '检测正在进行中'
+  }
+  if (hasStopped.value) {
+    return checkRecordsSaved.value
+      ? '当前检测已结束，请先复位后重新开始'
+      : '当前检测已结束，请先下载报告或复位后重新开始'
   }
   if (isFileMode.value && selectedPatientId.value && selectedTask.value && !isFilePayloadComplete()) {
     const missing = [
@@ -2324,6 +2386,10 @@ function handleStartButtonClick() {
   if (!inferenceAvailable.value) {
     ElMessage.warning(INFERENCE_UNAVAILABLE_MESSAGE)
     void refreshInferenceStatus()
+    return
+  }
+  if (hasStopped.value) {
+    ElMessage.warning(startTooltipContent.value)
     return
   }
   if (isFileMode.value && selectedPatientId.value && selectedTask.value && !isFilePayloadComplete()) {
@@ -2472,6 +2538,136 @@ function readClassOneProbability(item: any): number {
   return Number.isFinite(val) ? val : 0
 }
 
+const manualSegmentationEnabled = ref(false)
+const manualSwallowActive = ref(false)
+const manualSwallowStartSec = ref<number | null>(null)
+const manualSwallowSegments = ref<DetectionEventRange[]>([])
+
+const manualSwallowButtonText = computed(() =>
+  manualSwallowActive.value ? '结束吞咽' : '开始吞咽'
+)
+
+const canUseManualSwallowButton = computed(
+  () =>
+    !isFileMode.value &&
+    manualSegmentationEnabled.value &&
+    isDetecting.value &&
+    !!currentDeviceId.value
+)
+
+const manualSwallowTooltip = computed(() => {
+  if (!manualSegmentationEnabled.value) return '切换到手动分割吞咽段后可使用'
+  if (!isDetecting.value) return '实时检测开始后可记录吞咽段'
+  if (!currentDeviceId.value) return '请先选择检测设备'
+  return manualSwallowActive.value
+    ? '点击记录本次吞咽结束点'
+    : '点击记录本次吞咽起始点'
+})
+
+function resetManualSwallowState(resetMode = false) {
+  manualSwallowActive.value = false
+  manualSwallowStartSec.value = null
+  manualSwallowSegments.value = []
+  if (resetMode) {
+    manualSegmentationEnabled.value = false
+  }
+}
+
+function getCurrentRealtimeSecond() {
+  const elapsed =
+    startTime > 0 ? (performance.now() - startTime + totalElapsed) / 1000 : 0
+  return +Math.max(
+    latestRealtimeSeriesTime(),
+    realtimeRenderCursorSec,
+    elapsed,
+    0
+  ).toFixed(3)
+}
+
+async function syncSegmentationModeToBackend() {
+  if (isFileMode.value || !currentDeviceId.value || !realtimeSessionId.value) {
+    return
+  }
+  await setRealtimeSegmentationMode(
+    currentDeviceId.value,
+    manualSegmentationEnabled.value ? 'MANUAL' : 'AUTO'
+  )
+}
+
+async function handleSegmentationModeChange() {
+  manualSwallowActive.value = false
+  manualSwallowStartSec.value = null
+  manualSwallowSegments.value = []
+  if (!isDetecting.value) {
+    return
+  }
+  try {
+    await syncSegmentationModeToBackend()
+  } catch (e: any) {
+    showMonitorNotice({
+      title: '分割模式设置失败',
+      message: e?.message || '无法同步实时分割模式，请检查后端服务状态。',
+      type: 'warning',
+    })
+  }
+}
+
+async function handleManualSwallowClick() {
+  if (!canUseManualSwallowButton.value) {
+    ElMessage.warning(manualSwallowTooltip.value)
+    return
+  }
+
+  const nowSec = getCurrentRealtimeSecond()
+  if (!manualSwallowActive.value) {
+    manualSwallowStartSec.value = nowSec
+    manualSwallowActive.value = true
+    ElMessage.success(`已标记吞咽开始：${nowSec.toFixed(2)}s`)
+    return
+  }
+
+  const start = manualSwallowStartSec.value
+  if (start == null) {
+    manualSwallowActive.value = false
+    ElMessage.warning('缺少吞咽起始点，请重新标记')
+    return
+  }
+
+  const end = nowSec
+  if (end <= start + 0.05) {
+    ElMessage.warning('吞咽结束点需要晚于开始点')
+    return
+  }
+
+  const segment = {
+    start: +start.toFixed(3),
+    end: +end.toFixed(3),
+  }
+  manualSwallowSegments.value.push(segment)
+  manualSwallowActive.value = false
+  manualSwallowStartSec.value = null
+
+  try {
+    await submitManualSwallowSegment({
+      deviceId: currentDeviceId.value,
+      startSec: segment.start,
+      endSec: segment.end,
+    })
+    showMonitorNotice({
+      title: '人工吞咽段已提交',
+      message: `${segment.start.toFixed(2)}s - ${segment.end.toFixed(2)}s`,
+      type: 'success',
+      duration: 2500,
+    })
+  } catch (e: any) {
+    showMonitorNotice({
+      title: '人工吞咽段提交失败',
+      message: e?.message || '模型推理不会收到本次人工分割段，请重试。',
+      type: 'error',
+    })
+  }
+}
+
 function resetUiInputs() {
   selectedPatientId.value = ''
   selectedTask.value = ''
@@ -2482,6 +2678,7 @@ function resetUiInputs() {
   pendingScreeningPdf.value = null
   screeningReportDownloaded.value = false
   archiveDialogVisible.value = false
+  resetManualSwallowState(true)
 }
 
 function resetCsvState() {
@@ -2670,6 +2867,7 @@ function resetChartAndData() {
   aspirationSegments = []
   dysphagiaEventRanges = []
   aspirationEventRanges = []
+  resetManualSwallowState()
 
   // imuIdx = 0
   // gasIdx = 0
@@ -2782,7 +2980,7 @@ async function showDeviceOccupiedDialog(result: RealtimeConnectResult) {
 
 async function startDetection() {
   if (!canStartPrerequisites.value) {
-    ElMessage.warning('给定必填项后才能开始检测')
+    ElMessage.warning(startTooltipContent.value || '给定必填项后才能开始检测')
     return
   }
 
@@ -2878,6 +3076,7 @@ async function startDetection() {
 
     realtimeSessionId.value = connectResult.sessionId || ''
     hasConnectedDevice = true
+    await syncSegmentationModeToBackend()
 
     // 建立 WebSocket
     await connectWebSocket(primaryId)
@@ -2927,6 +3126,11 @@ async function stopDetection() {
   }
 
   // 实时模式 - 断开WebSocket和设备连接
+  if (manualSwallowActive.value) {
+    manualSwallowActive.value = false
+    manualSwallowStartSec.value = null
+    ElMessage.warning('未结束的人工吞咽段已取消')
+  }
   isDetecting.value = false
   hasStopped.value = true
   canReset.value = true
@@ -3039,7 +3243,7 @@ function renderEmptyCharts() {
 }
 
 // 信号图表统一坐标轴与网格样式，确保初始状态也展示清晰刻度。
-const SIGNAL_GRID = { top: 40, bottom: 28, left: 52, right: 20 }
+const SIGNAL_GRID = { top: 48, bottom: 28, left: 52, right: 20 }
 const SIGNAL_AXIS_COLOR = '#6b7280'
 const SIGNAL_GRID_COLOR = '#dbe3ef'
 
@@ -3450,6 +3654,113 @@ function createSingleOptionFile(
   }
 }
 
+function visibleManualSwallowRanges(start: number, end: number) {
+  const ranges = manualSwallowSegments.value.map(seg => ({ ...seg }))
+  return ranges
+    .map(seg => ({
+      start: Math.max(seg.start, start),
+      end: Math.min(seg.end, end),
+    }))
+    .filter(seg => seg.end > seg.start)
+}
+
+function visibleManualSwallowLines(start: number, end: number) {
+  const lines: Array<{ name: string; xAxis: number }> = []
+  const pushLine = (name: string, value: number | null | undefined) => {
+    if (value == null || !Number.isFinite(value)) return
+    if (value >= start && value <= end) {
+      lines.push({ name, xAxis: +value.toFixed(3) })
+    }
+  }
+
+  for (const seg of manualSwallowSegments.value) {
+    pushLine('开始', seg.start)
+    pushLine('结束', seg.end)
+  }
+  if (manualSwallowActive.value) {
+    pushLine('开始', manualSwallowStartSec.value)
+  }
+  return lines
+}
+
+function manualSwallowOverlay(start: number, end: number) {
+  const ranges = visibleManualSwallowRanges(start, end)
+  const lines = visibleManualSwallowLines(start, end)
+  if (ranges.length === 0 && lines.length === 0) {
+    return {}
+  }
+
+  return {
+    markArea:
+      ranges.length > 0
+        ? {
+            silent: true,
+            itemStyle: { color: 'rgba(245, 158, 11, 0.16)' },
+            label: { show: false },
+            data: ranges.map(seg => [{ xAxis: seg.start }, { xAxis: seg.end }]),
+          }
+        : undefined,
+    markLine:
+      lines.length > 0
+        ? {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { color: '#f59e0b', type: 'dashed', width: 2 },
+            label: {
+              show: true,
+              position: 'middle',
+              backgroundColor: 'rgba(255, 255, 255, 0.88)',
+              borderColor: 'rgba(245, 158, 11, 0.3)',
+              borderWidth: 1,
+              borderRadius: 4,
+              padding: [2, 5],
+              color: '#b45309',
+              formatter: (params: any) => params?.name || '',
+            },
+            data: lines,
+          }
+        : undefined,
+  }
+}
+
+function applyManualSwallowOverlayToCharts(
+  startShort: number,
+  endShort: number,
+  startLong: number,
+  endLong: number
+) {
+  if (isFileMode.value) return
+  if (
+    manualSwallowSegments.value.length === 0 &&
+    !manualSwallowActive.value
+  ) {
+    return
+  }
+
+  const shortOverlay = manualSwallowOverlay(startShort, endShort)
+  const longOverlay = manualSwallowOverlay(startLong, endLong)
+  const apply = (
+    chart: echarts.ECharts,
+    seriesCount: number,
+    overlay: Record<string, unknown>
+  ) => {
+    if (!Object.keys(overlay).length) return
+    chart.setOption(
+      {
+        series: Array.from({ length: seriesCount }, (_, idx) =>
+          idx === 0 ? overlay : {}
+        ),
+      },
+      { notMerge: false, silent: true }
+    )
+  }
+
+  apply(imuChart, 3, shortOverlay)
+  apply(gasChart, 1, shortOverlay)
+  apply(audioChart, 1, shortOverlay)
+  apply(swallowChart, 2, longOverlay)
+}
+
 // function showRiskAlert(risk: number) {
 //   let message = '' as string
 //   let type: 'info' | 'warning' | 'error' = 'info'
@@ -3709,6 +4020,8 @@ function frame(now: number = performance.now()) {
     },
     AXIS_UPDATE_SETOPTION
   )
+
+  applyManualSwallowOverlayToCharts(startShort, endShort, startLong, endLong)
 
   animationId = requestAnimationFrame(frame)
 }
@@ -4215,8 +4528,12 @@ function handleRealtimePredictionResult(result: any) {
     const windowEndTime = currentRelativeTime
     realtimeRenderCursorSec = Math.max(realtimeRenderCursorSec, windowEndTime)
 
-    // 后端预测窗口长度（秒）- 需要与后端保持一致
-    const PREDICTION_WINDOW_SEC = 5
+    const predictionWindowSec = Number(
+      result.predictionWindowSeconds || result.prediction_window_seconds || 5
+    )
+    const PREDICTION_WINDOW_SEC = Number.isFinite(predictionWindowSec)
+      ? Math.max(1, predictionWindowSec)
+      : 5
 
     console.log('当前相对时间:', currentRelativeTime.toFixed(2), 's')
     console.log('窗口结束时间:', windowEndTime.toFixed(2), 's')
@@ -5096,6 +5413,12 @@ onBeforeRouteLeave((to, from, next) => {
   margin: 0 6px;
 }
 
+.action-button-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .start-button-wrapper {
   display: inline-flex;
 }
@@ -5227,10 +5550,30 @@ onBeforeRouteLeave((to, from, next) => {
 }
 .chart-header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 .upload-btn {
   margin-right: 8px;
+}
+
+.segmentation-mode-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #4b5563;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.chart-header-divider {
+  align-self: stretch;
+  height: auto;
+  margin: 0 4px;
+}
+
+.manual-swallow-wrapper {
+  display: inline-flex;
 }
 
 .chart-tool-btn {
