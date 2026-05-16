@@ -6,115 +6,117 @@
         <div class="card-header">患者数据管理控制台</div>
       </template>
 
-      <!-- 第一行：可过滤多选 -->
-      <div class="console-row patient-picker-row">
-        <el-select-v2
-          v-model="selectedPatients"
-          filterable
-          :filter-method="handleFilterPatients"
-          multiple
-          collapse-tags
-          :max-collapse-tags="5"
-          size="small"
-          :options="patientOptions"
-          placeholder="请选择指定的患者"
-          class="console-full"
-          clearable
-          teleported
-        >
-          <template #prefix>
-            <el-icon><User /></el-icon>
-          </template>
+      <div class="toolbar-panel data-console-toolbar">
+        <!-- 第一行：可过滤多选 -->
+        <div class="console-row patient-picker-row">
+          <el-select-v2
+            v-model="selectedPatients"
+            filterable
+            :filter-method="handleFilterPatients"
+            multiple
+            collapse-tags
+            :max-collapse-tags="5"
+            size="small"
+            :options="patientOptions"
+            placeholder="请选择指定的患者"
+            class="console-full"
+            clearable
+            teleported
+          >
+            <template #prefix>
+              <el-icon><User /></el-icon>
+            </template>
 
-          <template #header>
-            <el-checkbox
-              v-model="checkAllPatients"
-              :indeterminate="indeterminatePatients"
-              @change="handleCheckAllPatients"
-            >
-              全选患者
-            </el-checkbox>
-          </template>
-        </el-select-v2>
-      </div>
+            <template #header>
+              <el-checkbox
+                v-model="checkAllPatients"
+                :indeterminate="indeterminatePatients"
+                @change="handleCheckAllPatients"
+              >
+                全选患者
+              </el-checkbox>
+            </template>
+          </el-select-v2>
+        </div>
 
-      <!-- 第二行：其他条件与按钮 -->
-      <div class="console-row console-filter-row">
-        <el-input
-          v-model="searchId"
-          placeholder="搜索患者 ID"
-          size="small"
-          clearable
-          class="console-item"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
+        <!-- 第二行：其他条件与按钮 -->
+        <div class="console-row console-filter-row">
+          <el-input
+            v-model="searchId"
+            placeholder="搜索患者 ID"
+            size="small"
+            clearable
+            class="console-item"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
 
-        <el-input
-          v-model="searchName"
-          placeholder="搜索患者姓名"
-          size="small"
-          clearable
-          class="console-item"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
+          <el-input
+            v-model="searchName"
+            placeholder="搜索患者姓名"
+            size="small"
+            clearable
+            class="console-item"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
 
-        <el-date-picker
-          v-model="searchDate"
-          type="date"
-          placeholder="请选择日期"
-          size="small"
-          clearable
-          class="console-item"
-        >
-          <template #prefix>
-            <el-icon><Calendar /></el-icon>
-          </template>
-        </el-date-picker>
+          <el-date-picker
+            v-model="searchDate"
+            type="date"
+            placeholder="请选择日期"
+            size="small"
+            clearable
+            class="console-item"
+          >
+            <template #prefix>
+              <el-icon><Calendar /></el-icon>
+            </template>
+          </el-date-picker>
 
-        <el-select
-          v-model="fileTypes"
-          multiple
-          placeholder="请选择文件类型"
-          size="small"
-          clearable
-          class="console-item"
-        >
-          <template #prefix>
-            <el-icon><Document /></el-icon>
-          </template>
-          <el-option label="csv" value="csv" />
-          <el-option label="wav" value="wav" />
-          <el-option label="pdf" value="pdf" />
-        </el-select>
+          <el-select
+            v-model="fileTypes"
+            multiple
+            placeholder="请选择文件类型"
+            size="small"
+            clearable
+            class="console-item"
+          >
+            <template #prefix>
+              <el-icon><Document /></el-icon>
+            </template>
+            <el-option label="csv" value="csv" />
+            <el-option label="wav" value="wav" />
+            <el-option label="pdf" value="pdf" />
+          </el-select>
 
-        <el-input
-          v-model="searchFile"
-          placeholder="搜索文件名"
-          size="small"
-          clearable
-          class="console-item"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
+          <el-input
+            v-model="searchFile"
+            placeholder="搜索文件名"
+            size="small"
+            clearable
+            class="console-item"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
 
-        <el-button
-          type="primary"
-          size="small"
-          class="export-btn"
-          dark
-          @click="onExportAll"
-        >
-          <el-icon style="margin-right: 4px"><Download /></el-icon>
-          批量导出
-        </el-button>
+          <el-button
+            type="primary"
+            size="small"
+            class="export-btn"
+            dark
+            @click="onExportAll"
+          >
+            <el-icon style="margin-right: 4px"><Download /></el-icon>
+            批量导出
+          </el-button>
+        </div>
       </div>
     </el-card>
 
@@ -137,7 +139,7 @@
           </template>
 
           <div class="card-content">
-            <div class="card-filters">
+            <div class="toolbar-panel card-filters">
               <div class="patient-controls-row">
                 <el-date-picker
                   v-model="patientFilters[patient.id].searchDate"
@@ -570,7 +572,8 @@ async function onExportAll() {
 }
 
 .console-card {
-  width: 1304px;
+  width: min(1304px, calc(100vw - 260px));
+  max-width: 100%;
   margin-bottom: 24px;
 }
 
@@ -591,6 +594,16 @@ async function onExportAll() {
   margin-bottom: 12px;
 }
 
+.data-console-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.data-console-toolbar .console-row {
+  margin-bottom: 0;
+}
+
 .patient-picker-row {
   grid-template-columns: 1fr;
 }
@@ -608,7 +621,8 @@ async function onExportAll() {
 }
 
 .card-grid {
-  width: 1304px;
+  width: min(1304px, calc(100vw - 260px));
+  max-width: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(408px, 1fr));
   gap: 20px;

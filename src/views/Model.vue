@@ -1,34 +1,58 @@
 <template>
   <div class="model-container">
     <div class="grid-wrapper">
-      <el-card shadow="hover" class="stat-card">
-        <div class="stat-title">推理服务状态</div>
+      <el-card shadow="hover" class="stat-card stat-card-service">
+        <div class="stat-head">
+          <div class="stat-icon">
+            <el-icon><Cpu /></el-icon>
+          </div>
+          <div class="stat-title">推理服务状态</div>
+        </div>
         <div class="stat-main">
-          <el-tag :type="serviceStatusTag" size="large">{{ serviceStatusText }}</el-tag>
+          <el-tag :type="serviceStatusTag" size="large" effect="light">{{ serviceStatusText }}</el-tag>
         </div>
         <div class="stat-sub">最近探活：{{ formatDateTime(runtimeSummary.lastHealthCheckAt) }}</div>
-        <div v-if="runtimeSummary.lastHealthError" class="stat-error">{{ runtimeSummary.lastHealthError }}</div>
+        <div class="service-status-strip">
+          <div class="service-status-pill">
+            <el-icon><CircleCheck /></el-icon>
+            <span>探活</span>
+          </div>
+        </div>
       </el-card>
 
-      <el-card shadow="hover" class="stat-card">
-        <div class="stat-title">模型加载概览</div>
-        <div class="stat-number">{{ runtimeSummary.loadedModelCount }} / {{ runtimeSummary.discoveredModelCount }}</div>
+      <el-card shadow="hover" class="stat-card stat-card-load">
+        <div class="stat-head">
+          <div class="stat-icon">
+            <el-icon><Files /></el-icon>
+          </div>
+          <div class="stat-title">模型加载概览</div>
+        </div>
+        <el-statistic :value="runtimeSummary.loadedModelCount" class="stat-number">
+          <template #suffix>/ {{ runtimeSummary.discoveredModelCount }}</template>
+        </el-statistic>
         <div class="stat-sub">已加载模型 / 发现模型</div>
-        <el-progress :percentage="loadPercentage" :stroke-width="8" />
+        <el-progress :percentage="loadPercentage" :stroke-width="8" class="stat-progress" />
       </el-card>
 
-      <el-card shadow="hover" class="stat-card">
-        <div class="stat-title">模型可用概览</div>
-        <div class="stat-number">{{ runtimeSummary.availableModelCount }} / {{ runtimeSummary.discoveredModelCount }}</div>
+      <el-card shadow="hover" class="stat-card stat-card-available">
+        <div class="stat-head">
+          <div class="stat-icon">
+            <el-icon><CircleCheck /></el-icon>
+          </div>
+          <div class="stat-title">模型可用概览</div>
+        </div>
+        <el-statistic :value="runtimeSummary.availableModelCount" class="stat-number">
+          <template #suffix>/ {{ runtimeSummary.discoveredModelCount }}</template>
+        </el-statistic>
         <div class="stat-sub">可用模型 / 发现模型</div>
-        <el-progress :percentage="availablePercentage" status="success" :stroke-width="8" />
+        <el-progress :percentage="availablePercentage" status="success" :stroke-width="8" class="stat-progress" />
       </el-card>
 
       <el-card shadow="hover" class="table-card">
         <template #header>
           <div class="card-header">
-            <span>模型运行态管理</span>
-            <el-button type="primary" size="small" :loading="tableLoading || summaryLoading" @click="refreshAll">
+            <span>模型运行态监测</span>
+            <el-button type="primary" size="small" :disabled="tableLoading || summaryLoading" @click="refreshAll">
               <el-icon class="icon-with-margin"><Refresh /></el-icon>
               手动刷新状态
             </el-button>
@@ -63,6 +87,7 @@
             size="small"
             class="filter-control"
           >
+            <template #prefix><el-icon><Files /></el-icon></template>
             <el-option label="已加载" value="true" />
             <el-option label="未加载" value="false" />
           </el-select>
@@ -74,12 +99,21 @@
             size="small"
             class="filter-control"
           >
+            <template #prefix><el-icon><CircleCheck /></el-icon></template>
             <el-option label="可用" value="true" />
             <el-option label="不可用" value="false" />
           </el-select>
         </div>
 
-        <el-table v-loading="tableLoading" :data="runtimeModels" stripe border size="small" class="model-table">
+        <el-table
+          v-loading="tableLoading"
+          :data="runtimeModels"
+          stripe
+          border
+          size="small"
+          class="model-table"
+          table-layout="fixed"
+        >
           <template #empty>
             <div class="empty-state">
               <div class="empty-title">{{ emptyStateTitle }}</div>
@@ -87,24 +121,24 @@
             </div>
           </template>
 
-          <el-table-column prop="name" label="模型名称" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="taskType" label="任务类型" min-width="190" show-overflow-tooltip />
-          <el-table-column prop="modelVersion" label="模型版本" min-width="160" show-overflow-tooltip />
-          <el-table-column prop="deployPath" label="部署位置" min-width="220" show-overflow-tooltip />
+          <el-table-column prop="name" label="模型名称" width="112" show-overflow-tooltip />
+          <el-table-column prop="taskType" label="任务类型" width="88" show-overflow-tooltip />
+          <el-table-column prop="modelVersion" label="版本" width="84" show-overflow-tooltip />
+          <el-table-column prop="deployPath" label="部署位置" min-width="230" show-overflow-tooltip />
 
-          <el-table-column label="是否已加载" min-width="110">
+          <el-table-column label="加载" width="82">
             <template #default="{ row }">
               <el-tag :type="row.loaded ? 'success' : 'info'">{{ row.loaded ? '已加载' : '未加载' }}</el-tag>
             </template>
           </el-table-column>
 
-          <el-table-column label="服务状态" min-width="130">
+          <el-table-column label="服务" width="82">
             <template #default="{ row }">
               <el-tag :type="getServiceTagType(row)">{{ getServiceText(row) }}</el-tag>
             </template>
           </el-table-column>
 
-          <el-table-column label="模型可用" min-width="110">
+          <el-table-column label="可用" width="82">
             <template #default="{ row }">
               <el-tag :type="isModelAvailable(row) ? 'success' : 'danger'">
                 {{ isModelAvailable(row) ? '可用' : '不可用' }}
@@ -112,13 +146,13 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="最近探活时间" min-width="170">
+          <el-table-column label="最近探活" width="132">
             <template #default="{ row }">
               {{ formatDateTime(row.lastHealthCheckAt) }}
             </template>
           </el-table-column>
 
-          <el-table-column label="最近错误" min-width="240" show-overflow-tooltip>
+          <el-table-column label="最近错误" width="150" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.lastHealthError || '-' }}
             </template>
@@ -132,7 +166,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { CircleCheck, Cpu, Files, Refresh, Search } from '@element-plus/icons-vue'
 import { getRuntimeSummary, listRuntimeModels } from '@/api/model'
 import type { RuntimeModelRow, RuntimeSummary } from '@/types/model'
 
@@ -166,6 +200,10 @@ const runtimeSummary = reactive<RuntimeSummary>({
 
 const runtimeModels = ref<RuntimeModelRow[]>([])
 
+const hasActiveFilters = computed(() => {
+  return Boolean(filters.name || filters.taskType || filters.loaded || filters.available)
+})
+
 const serviceStatusText = computed(() => {
   if (!runtimeSummary.serviceLive) return '未启动/不可达'
   if (!runtimeSummary.serviceReady) return '已启动未就绪'
@@ -191,6 +229,7 @@ const availablePercentage = computed(() => {
 const emptyStateTitle = computed(() => {
   if (!runtimeSummary.serviceLive) return '推理服务未启动或不可达'
   if (!runtimeSummary.serviceReady) return '服务已启动，模型加载中'
+  if (hasActiveFilters.value) return '当前筛选条件下无匹配模型'
   return '当前未发现已接入模型'
 })
 
@@ -204,6 +243,15 @@ const emptyStateDescription = computed(() => {
   }
   if (!runtimeSummary.serviceReady) {
     return `最近探活时间：${checkedAt}`
+  }
+  if (hasActiveFilters.value) {
+    if (filters.loaded === 'false' && runtimeSummary.discoveredModelCount > 0 && runtimeSummary.loadedModelCount === runtimeSummary.discoveredModelCount) {
+      return '当前发现的模型均已加载，请调整加载状态筛选条件。'
+    }
+    if (filters.available === 'false' && runtimeSummary.discoveredModelCount > 0 && runtimeSummary.availableModelCount === runtimeSummary.discoveredModelCount) {
+      return '当前发现的模型均可用，请调整可用状态筛选条件。'
+    }
+    return '请调整模型名称、任务类型或状态筛选条件。'
   }
   return `最近探活时间：${checkedAt}`
 })
@@ -290,18 +338,50 @@ onMounted(() => {
 
 .grid-wrapper {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  width: 1304px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 24px;
+  width: min(1304px, calc(100vw - 260px));
   max-width: 100%;
 }
 
 .stat-card,
 .table-card {
+  min-width: 0;
   background: #fff;
-  padding: 20px;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(31, 41, 55, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.stat-card {
+  position: relative;
+  min-height: 152px;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: #409eff;
+}
+
+.stat-card-load::before {
+  background: #2f7df6;
+}
+
+.stat-card-available::before {
+  background: #67c23a;
+}
+
+.stat-card :deep(.el-card__body) {
+  height: 100%;
+  padding: 24px;
+}
+
+.table-card :deep(.el-card__body) {
+  padding: 18px 20px 20px;
 }
 
 .table-card {
@@ -309,7 +389,36 @@ onMounted(() => {
 }
 
 :deep(.el-card__header) {
-  padding: 6px 0;
+  padding: 28px 20px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stat-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stat-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #2f7df6;
+  background: #ecf5ff;
+  font-size: 18px;
+}
+
+.stat-card-service .stat-icon {
+  color: #0f766e;
+  background: #e8f7f3;
+}
+
+.stat-card-available .stat-icon {
+  color: #3a9f2f;
+  background: #edf8e9;
 }
 
 .stat-title {
@@ -324,9 +433,18 @@ onMounted(() => {
 
 .stat-number {
   margin-top: 14px;
+}
+
+.stat-number :deep(.el-statistic__number) {
   font-size: 30px;
+  line-height: 1;
   font-weight: 700;
-  color: #303133;
+  color: #1f2937;
+}
+
+.stat-number :deep(.el-statistic__suffix) {
+  margin-left: 6px;
+  color: #1f2937;
 }
 
 .stat-sub {
@@ -335,10 +453,34 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.stat-error {
+.service-status-strip {
+  min-height: 22px;
   margin-top: 8px;
-  color: #f56c6c;
-  font-size: 13px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.service-status-pill {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #409eff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.service-status-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-progress {
+  margin-top: 8px;
 }
 
 .card-header {
@@ -363,7 +505,11 @@ onMounted(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 14px;
+  padding: 10px;
   align-items: center;
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 6px;
 }
 
 .filter-control {
@@ -372,6 +518,21 @@ onMounted(() => {
 
 .model-table {
   width: 100%;
+}
+
+:deep(.model-table .el-table__cell) {
+  padding: 6px 0;
+}
+
+:deep(.model-table .el-table__header th) {
+  color: #606f7b;
+  background: #f8fafc;
+  font-weight: 650;
+}
+
+:deep(.model-table .cell) {
+  padding: 0 8px;
+  white-space: nowrap;
 }
 
 .empty-state {
@@ -389,7 +550,7 @@ onMounted(() => {
   font-size: 13px;
 }
 
-@media (max-width: 1360px) {
+@media (max-width: 1100px) {
   .grid-wrapper {
     min-width: 0;
     width: 100%;

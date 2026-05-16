@@ -310,13 +310,15 @@ const riverOption = computed(() => ({
 }
 .grid-wrapper {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
-  min-width: 1200px;
+  width: min(1304px, calc(100vw - 260px));
+  max-width: 100%;
+  min-width: 0;
 }
 .card {
-  min-width: 580px;
-  max-width: 640px;
+  min-width: 0;
+  max-width: none;
   padding: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transition: box-shadow 0.3s;

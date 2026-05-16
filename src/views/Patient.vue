@@ -59,8 +59,8 @@
           :row-style="row35Style"
           :cell-style="cell35Style"
         >
-          <el-table-column prop="id" label="就诊编号" width="166" show-overflow-tooltip />
-          <el-table-column label="姓名" width="86">
+          <el-table-column prop="id" label="就诊编号" min-width="172" show-overflow-tooltip />
+          <el-table-column label="姓名" min-width="98">
             <template #default="{ row }">
               <template v-if="!row.__filler">
                 <div class="appointment-name-cell">
@@ -80,9 +80,9 @@
               </template>
             </template>
           </el-table-column>
-          <el-table-column prop="dept" label="预约科室" width="82" show-overflow-tooltip />
-          <el-table-column prop="time" label="预约时间" width="102" />
-          <el-table-column label="操作" width="122">
+          <el-table-column prop="dept" label="预约科室" min-width="108" show-overflow-tooltip />
+          <el-table-column prop="time" label="预约时间" min-width="118" />
+          <el-table-column label="操作" width="124">
             <template #default="{ row }">
               <template v-if="!row.__filler">
                 <div class="appointment-actions">
@@ -121,6 +121,7 @@
           title="新增预约"
           width="620px"
           :close-on-click-modal="false"
+          @closed="onCreateApptDialogClosed"
         >
           <el-form
             ref="createApptRef"
@@ -191,6 +192,7 @@
 
           <template #footer>
             <el-button @click="createApptVisible = false">取消</el-button>
+            <el-button @click="clearCreateApptForm">清空</el-button>
             <el-button
               type="primary"
               :loading="createApptSubmitting"
@@ -280,6 +282,7 @@
 
           <template #footer>
             <el-button @click="editApptVisible = false">取消</el-button>
+            <el-button @click="restoreEditApptForm">恢复原值</el-button>
             <el-button
               type="primary"
               :loading="editApptSubmitting"
@@ -677,6 +680,7 @@
 
           <template #footer>
             <el-button @click="createVisible = false">取消</el-button>
+            <el-button @click="clearCreatePatientForm">清空</el-button>
             <el-button
               type="primary"
               :loading="createSubmitting"
@@ -781,6 +785,7 @@
 
           <template #footer>
             <el-button @click="editVisible = false">取消</el-button>
+            <el-button @click="restoreEditPatientForm">恢复原值</el-button>
             <el-button
               type="primary"
               :loading="editSubmitting"
@@ -997,15 +1002,48 @@ function apptRowClassName({ row }: { row: any }) {
 const createApptVisible = ref(false)
 const createApptSubmitting = ref(false)
 const createApptRef = ref<FormInstance>()
+const createApptCloseFromSuccess = ref(false)
+const createApptValidationSuspended = ref(false)
 
-const createApptForm = reactive({
-  name: '',
-  gender: '' as '' | '男' | '女',
-  idCard: '',
-  phone: '',
-  dept: '',
-  time: '',
-})
+type AppointmentFormState = {
+  name: string
+  gender: '' | '男' | '女'
+  idCard: string
+  phone: string
+  dept: string
+  time: string
+}
+
+function emptyCreateApptForm(): AppointmentFormState {
+  return {
+    name: '',
+    gender: '',
+    idCard: '',
+    phone: '',
+    dept: '',
+    time: '',
+  }
+}
+
+const createApptForm = reactive<AppointmentFormState>(emptyCreateApptForm())
+const createApptDraft = ref<AppointmentFormState | null>(null)
+
+function snapshotCreateApptForm(): AppointmentFormState {
+  return { ...createApptForm }
+}
+
+function isCreateApptFormBlank(form: AppointmentFormState): boolean {
+  return Object.values(form).every((value) => String(value ?? '').trim() === '')
+}
+
+function applyCreateApptForm(form: AppointmentFormState) {
+  createApptValidationSuspended.value = true
+  Object.assign(createApptForm, form)
+  nextTick(() => {
+    createApptRef.value?.clearValidate()
+    createApptValidationSuspended.value = false
+  })
+}
 
 const createApptRules: FormRules = {
   name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
@@ -1025,55 +1063,80 @@ const createApptRules: FormRules = {
 const validateApptFieldSilently = (
   prop: 'name' | 'gender' | 'idCard' | 'phone' | 'dept' | 'time',
 ) => {
+  if (!createApptVisible.value || createApptValidationSuspended.value) return
   createApptRef.value?.validateField(prop, () => {})
 }
 const validateApptDebounced = debounce(validateApptFieldSilently, 200)
 const createApptIdCardMeta = computed(() => idCardMeta(createApptForm.idCard))
 
+function queueCreateApptValidation(
+  prop: 'name' | 'gender' | 'idCard' | 'phone' | 'dept' | 'time',
+) {
+  if (!createApptVisible.value || createApptValidationSuspended.value) return
+  validateApptDebounced(prop)
+}
+
 watch(
   () => createApptForm.name,
-  () => validateApptDebounced('name'),
+  () => queueCreateApptValidation('name'),
 )
 watch(
   () => createApptForm.gender,
-  () => validateApptDebounced('gender'),
+  () => queueCreateApptValidation('gender'),
 )
 watch(
   () => createApptForm.idCard,
   (value) => {
     const inferred = genderFromIdCard(value)
     if (inferred) createApptForm.gender = inferred
-    validateApptDebounced('idCard')
-    validateApptDebounced('gender')
+    queueCreateApptValidation('idCard')
+    queueCreateApptValidation('gender')
   },
 )
 watch(
   () => createApptForm.phone,
-  () => validateApptDebounced('phone'),
+  () => queueCreateApptValidation('phone'),
 )
 watch(
   () => createApptForm.dept,
-  () => validateApptDebounced('dept'),
+  () => queueCreateApptValidation('dept'),
 )
 watch(
   () => createApptForm.time,
-  () => validateApptDebounced('time'),
+  () => queueCreateApptValidation('time'),
 )
 
 function resetCreateApptForm() {
-  Object.assign(createApptForm, {
-    name: '',
-    gender: '',
-    idCard: '',
-    phone: '',
-    dept: '',
-    time: '',
-  })
+  applyCreateApptForm(emptyCreateApptForm())
 }
 
 function onOpenCreateAppt() {
-  resetCreateApptForm()
+  applyCreateApptForm(createApptDraft.value ?? emptyCreateApptForm())
   createApptVisible.value = true
+}
+
+function onCreateApptDialogClosed() {
+  if (createApptCloseFromSuccess.value) {
+    createApptCloseFromSuccess.value = false
+    createApptDraft.value = null
+    resetCreateApptForm()
+    return
+  }
+
+  const snapshot = snapshotCreateApptForm()
+  if (isCreateApptFormBlank(snapshot)) {
+    createApptDraft.value = null
+    resetCreateApptForm()
+    return
+  }
+
+  createApptDraft.value = snapshot
+  createApptRef.value?.clearValidate()
+}
+
+function clearCreateApptForm() {
+  createApptDraft.value = null
+  resetCreateApptForm()
 }
 
 async function onCreateApptSubmit() {
@@ -1083,6 +1146,7 @@ async function onCreateApptSubmit() {
 
   createApptSubmitting.value = true
   try {
+    const appointmentDate = createApptForm.time
     const payload = {
       name: createApptForm.name.trim(),
       gender: createApptForm.gender as '男' | '女',
@@ -1093,11 +1157,13 @@ async function onCreateApptSubmit() {
     }
     const created = await createAppointment(payload)
     ElMessage.success(`添加成功（就诊编号：${created.id}）`)
+    createApptDraft.value = null
+    createApptCloseFromSuccess.value = true
     createApptVisible.value = false
     
     // 将日期选择器设置为新添加的预约日期，确保能看到新添加的预约
-    if (createApptForm.time) {
-      apptSelectedDate.value = new Date(createApptForm.time)
+    if (appointmentDate) {
+      apptSelectedDate.value = new Date(appointmentDate)
     }
     
     // 清除搜索条件，确保能看到新添加的预约
@@ -1116,7 +1182,11 @@ const editApptVisible = ref(false)
 const editApptSubmitting = ref(false)
 const editApptRef = ref<FormInstance>()
 
-const editApptForm = reactive({
+type EditAppointmentFormState = AppointmentFormState & {
+  id: string
+}
+
+const editApptForm = reactive<EditAppointmentFormState>({
   id: '',
   name: '',
   gender: '' as '' | '男' | '女',
@@ -1125,6 +1195,18 @@ const editApptForm = reactive({
   dept: '',
   time: '',
 })
+const editApptOriginal = ref<EditAppointmentFormState | null>(null)
+
+function applyEditApptForm(form: EditAppointmentFormState) {
+  Object.assign(editApptForm, form)
+  nextTick(() => editApptRef.value?.clearValidate())
+}
+
+function restoreEditApptForm() {
+  if (editApptOriginal.value) {
+    applyEditApptForm(editApptOriginal.value)
+  }
+}
 
 const editApptRules: FormRules = {
   phone: [{ max: 32, message: '联系电话长度不能超过32个字符', trigger: 'blur' }],
@@ -1154,13 +1236,17 @@ watch(
 )
 
 function onOpenEditAppt(row: AppointmentRow) {
-  editApptForm.id = row.id
-  editApptForm.name = row.name ?? ''
-  editApptForm.gender = (row.gender ?? '') as '' | '男' | '女'
-  editApptForm.idCard = row.idCard ?? ''
-  editApptForm.phone = row.phone ?? ''
-  editApptForm.dept = row.dept ?? ''
-  editApptForm.time = row.time ?? ''
+  const form = {
+    id: row.id,
+    name: row.name ?? '',
+    gender: (row.gender ?? '') as '' | '男' | '女',
+    idCard: row.idCard ?? '',
+    phone: row.phone ?? '',
+    dept: row.dept ?? '',
+    time: row.time ?? '',
+  }
+  editApptOriginal.value = { ...form }
+  applyEditApptForm(form)
   editApptVisible.value = true
 }
 
@@ -1177,6 +1263,7 @@ async function onEditApptSubmit() {
       time: editApptForm.time,
     })
     ElMessage.success('保存成功')
+    editApptOriginal.value = null
     editApptVisible.value = false
     await fetchAppointments()
   } finally {
@@ -1573,6 +1660,11 @@ function onCreateDialogClosed() {
   createRef.value?.clearValidate()
 }
 
+function clearCreatePatientForm() {
+  createDraft.value = null
+  resetCreateForm()
+}
+
 async function onCreateSubmit() {
   if (!createRef.value || createSubmitting.value) return
   const ok = await createRef.value.validate().catch(() => false)
@@ -1606,7 +1698,11 @@ const editVisible = ref(false)
 const editSubmitting = ref(false)
 const editRef = ref<FormInstance>()
 
-const editForm = reactive({
+type EditPatientFormState = PatientFormState & {
+  id: string
+}
+
+const editForm = reactive<EditPatientFormState>({
   id: '',
   name: '',
   gender: '' as '' | '男' | '女',
@@ -1617,6 +1713,18 @@ const editForm = reactive({
   bedNumber: '',
   course: '',
 })
+const editOriginal = ref<EditPatientFormState | null>(null)
+
+function applyEditPatientForm(form: EditPatientFormState) {
+  Object.assign(editForm, form)
+  nextTick(() => editRef.value?.clearValidate())
+}
+
+function restoreEditPatientForm() {
+  if (editOriginal.value) {
+    applyEditPatientForm(editOriginal.value)
+  }
+}
 
 const editRules: FormRules = {
   name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
@@ -1683,15 +1791,19 @@ watch(
 )
 
 function onOpenEdit(row: PatientRow) {
-  editForm.id = row.id
-  editForm.name = row.name ?? ''
-  editForm.gender = (row.gender ?? '') as '' | '男' | '女'
-  editForm.dept = row.dept ?? ''
-  editForm.idCard = row.idCard ?? ''
-  editForm.onsetDate = row.onsetDate ?? ''
-  editForm.pastHistory = row.pastHistory ?? ''
-  editForm.bedNumber = row.bedNumber ?? ''
-  editForm.course = row.course ?? ''
+  const form = {
+    id: row.id,
+    name: row.name ?? '',
+    gender: (row.gender ?? '') as '' | '男' | '女',
+    dept: row.dept ?? '',
+    idCard: row.idCard ?? '',
+    onsetDate: row.onsetDate ?? '',
+    pastHistory: row.pastHistory ?? '',
+    bedNumber: row.bedNumber ?? '',
+    course: row.course ?? '',
+  }
+  editOriginal.value = { ...form }
+  applyEditPatientForm(form)
   editVisible.value = true
 }
 
@@ -1713,6 +1825,7 @@ async function onEditSubmit() {
       course: editForm.course.trim(),
     })
     ElMessage.success('保存成功')
+    editOriginal.value = null
     editVisible.value = false
     await fetchPatients()
   } finally {
@@ -1771,9 +1884,10 @@ function cell35Style() {
 }
 .grid-wrapper {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
-  width: 1304px;
+  width: min(1304px, calc(100vw - 260px));
+  max-width: 100%;
 }
 .card {
   width: 100%;

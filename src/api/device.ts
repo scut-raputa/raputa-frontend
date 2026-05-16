@@ -30,9 +30,10 @@ export async function connectRealtimeDevice(
   deviceId: string,
   deviceName: string,
   patientId: string,
-  patientName: string
+  patientName: string,
+  taskType: string
 ) {
-  const body = { deviceIp, deviceId, deviceName, patientId, patientName }
+  const body = { deviceIp, deviceId, deviceName, patientId, patientName, taskType }
   const resp = await postJson<RealtimeConnectResult>('/api/realtime/connect', body, { timeout: 10000 })
   const ok = resp?.code === 0 || resp?.code === 200
   if (!ok) throw new Error(resp?.message || '设备连接失败')

@@ -44,7 +44,8 @@ export async function uploadAndPredict(
   imuFile: File,
   gasFile: File,
   patientId: string,
-  patientName: string
+  patientName: string,
+  taskType: string
 ): Promise<DetectionResponse> {
   const formData = new FormData()
   formData.append('audio', audioFile)
@@ -52,6 +53,7 @@ export async function uploadAndPredict(
   formData.append('gas', gasFile)
   formData.append('patientId', patientId)
   formData.append('patientName', patientName || '')
+  formData.append('taskType', taskType)
 
   try {
     const response = await postJson<DetectionResponse>(

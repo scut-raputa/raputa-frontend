@@ -60,16 +60,19 @@ export function installRouterGuards(router: Router) {
     if (isSystemRoute && user.role !== 'ADMIN') {
       ElMessage.error('无权限访问系统管理')
       const back =
-        from.path && from.path !== to.path ? from.path : '/dashboard/department'
+        from.path && from.path !== to.path ? from.path : '/dashboard/device'
       return next({ path: back, replace: true })
     }
 
-    const isDepartmentRoute =
-      to.path === '/department' || to.path.startsWith('/dashboard/department')
-    if (isDepartmentRoute && user.role !== 'DEPARTMENT') {
-      ElMessage.error('无权限访问科室管理')
+    const isDeviceRoute =
+      to.path === '/device' ||
+      to.path.startsWith('/dashboard/device') ||
+      to.path === '/department' ||
+      to.path.startsWith('/dashboard/department')
+    if (isDeviceRoute && user.role !== 'DEPARTMENT' && user.role !== 'ADMIN') {
+      ElMessage.error('无权限访问设备管理')
       const back =
-        from.path && from.path !== to.path ? from.path : '/dashboard/system'
+        from.path && from.path !== to.path ? from.path : homePathForRole(user.role)
       return next({ path: back, replace: true })
     }
 

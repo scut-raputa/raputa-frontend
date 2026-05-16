@@ -92,11 +92,11 @@
               <el-icon><Histogram /></el-icon>
               <template #title>数据统计</template>
             </el-menu-item>
-            <el-menu-item v-if="!isAdmin" index="/dashboard/department">
+            <el-menu-item index="/dashboard/device">
               <el-icon><Setting /></el-icon>
-              <template #title>科室管理</template>
+              <template #title>设备管理</template>
             </el-menu-item>
-            <el-menu-item v-else index="/dashboard/system">
+            <el-menu-item v-if="isAdmin" index="/dashboard/system">
               <el-icon><Setting /></el-icon>
               <template #title>系统管理</template>
             </el-menu-item>
@@ -367,6 +367,8 @@ body {
   justify-content: center;
   align-items: flex-start;
   box-sizing: border-box;
+  width: calc(100vw - 200px);
+  max-width: calc(100vw - 200px);
   padding: 2rem 1rem;
   background-color: #f9fafb;
   min-height: calc(100vh - 80px);
@@ -375,11 +377,14 @@ body {
 }
 .el-main.collapsed {
   margin-left: 64px;
+  width: calc(100vw - 64px);
+  max-width: calc(100vw - 64px);
 }
 
 /* 内部内容容器 */
 .main-inner {
-  min-width: 960px;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
   margin-top: auto;

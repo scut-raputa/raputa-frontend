@@ -1,581 +1,608 @@
 <template>
-  <div class="system-container">
-    <div class="grid-wrapper">
-      <!-- ─── 设备信息 ─────────────────────────────── -->
-      <el-card shadow="hover" class="card wide">
+  <div class="device-page">
+    <div class="device-shell">
+      <el-card shadow="hover" class="stat-card stat-card-total">
+        <div class="stat-head">
+          <div class="stat-icon">
+            <el-icon><Box /></el-icon>
+          </div>
+          <div class="stat-title">登记设备</div>
+        </div>
+        <el-statistic :value="deviceTotal" class="stat-number" />
+        <div class="stat-meta-row">
+          <el-tag size="small" type="primary" effect="light">资产台账</el-tag>
+          <span>{{ deviceTotal > 0 ? '已有登记设备' : '暂无登记设备' }}</span>
+        </div>
+        <el-progress :percentage="registeredPercentage" :show-text="false" :stroke-width="8" class="stat-progress" />
+      </el-card>
+
+      <el-card shadow="hover" class="stat-card stat-card-online">
+        <div class="stat-head">
+          <div class="stat-icon">
+            <el-icon><CircleCheck /></el-icon>
+          </div>
+          <div class="stat-title">当前在线</div>
+        </div>
+        <el-statistic :value="onlineCount" class="stat-number" />
+        <div class="stat-meta-row">
+          <el-tag size="small" type="success" effect="light">在线率</el-tag>
+          <span>{{ onlinePercentage }}%</span>
+        </div>
+        <el-progress
+          :percentage="onlinePercentage"
+          status="success"
+          :show-text="false"
+          :stroke-width="8"
+          class="stat-progress"
+        />
+      </el-card>
+
+      <el-card shadow="hover" class="stat-card stat-card-occupied">
+        <div class="stat-head">
+          <div class="stat-icon">
+            <el-icon><Connection /></el-icon>
+          </div>
+          <div class="stat-title">会话占用</div>
+        </div>
+        <el-statistic :value="occupiedCount" class="stat-number" />
+        <div class="stat-meta-row">
+          <el-tag size="small" type="warning" effect="light">占用率</el-tag>
+          <span>{{ occupiedPercentage }}%</span>
+        </div>
+        <el-progress
+          :percentage="occupiedPercentage"
+          color="#e6a23c"
+          :show-text="false"
+          :stroke-width="8"
+          class="stat-progress"
+        />
+      </el-card>
+
+      <el-card shadow="hover" class="table-card">
         <template #header>
-          <div class="card-header">设备信息</div>
+          <div class="card-header">
+            <span>设备资产与会话</span>
+            <el-button type="primary" size="small" :disabled="refreshingStatus" @click="refreshDevices">
+              <el-icon class="icon-with-margin"><Refresh /></el-icon>
+              手动刷新状态
+            </el-button>
+          </div>
         </template>
 
         <div class="controls-row">
-          <el-input v-model="deviceSearchId" placeholder="搜索资产编号" size="small"
-            clearable style="width: 200px">
+          <el-input v-model="deviceSearchId" placeholder="搜索资产编号" size="small" clearable>
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
-
-          <el-input v-model="deviceSearchName" placeholder="搜索设备名称" size="small"
-            clearable style="width: 200px">
+          <el-input v-model="deviceSearchName" placeholder="搜索设备名称" size="small" clearable>
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
-
-          <el-input v-model="deviceSearchOwner" placeholder="搜索负责人" size="small"
-            clearable style="width: 160px">
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
-
-          <el-select v-model="deviceStatusFilter" placeholder="设备状态" size="small"
-            clearable style="width: 140px">
+          <el-select v-model="deviceLocationFilter" placeholder="保管/部署位置" size="small" clearable>
+            <template #prefix><el-icon><Location /></el-icon></template>
+            <el-option v-for="loc in locationOptions" :key="loc" :label="loc" :value="loc" />
+          </el-select>
+          <el-select v-model="deviceStatusFilter" placeholder="在线状态" size="small" clearable>
             <template #prefix><el-icon><Link /></el-icon></template>
             <el-option label="在线" value="在线" />
             <el-option label="离线" value="离线" />
           </el-select>
-
-          <el-select v-model="deviceLocationFilter" placeholder="设备保管地点" size="small"
-            clearable style="width: 180px">
-            <template #prefix><el-icon><Location /></el-icon></template>
-            <el-option v-for="loc in locationOptions" :key="loc" :label="loc" :value="loc" />
-          </el-select>
-
-          <el-button type="primary" size="small" @click="openDeviceCreate">
-            <el-icon class="icon-with-margin"><Plus /></el-icon>添加设备
-          </el-button>
         </div>
 
-        <el-table v-loading="deviceLoading" :data="deviceRows" stripe border size="small"
-          class="table" style="margin-bottom: 16px"
+        <el-table
+          v-loading="deviceLoading"
+          :data="deviceRows"
+          stripe
+          border
+          size="small"
+          class="table"
           :row-class-name="deviceRowClassName"
-          :row-style="row35Style" :cell-style="cell35Style">
-          <el-table-column prop="id" label="资产编号" min-width="110" show-overflow-tooltip />
-          <el-table-column prop="name" label="设备名称" min-width="160" show-overflow-tooltip />
-          <el-table-column prop="ip" label="当前IP" min-width="130" />
-          <el-table-column label="设备状态" width="90">
+          :row-style="row35Style"
+          :cell-style="cell35Style"
+        >
+          <el-table-column prop="id" label="资产编号" width="145" show-overflow-tooltip />
+          <el-table-column prop="name" label="设备名称" width="110" show-overflow-tooltip />
+          <el-table-column prop="ip" label="当前 IP" width="118" show-overflow-tooltip />
+          <el-table-column prop="storageLocation" label="保管/部署位置" width="118" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="!row.__filler">{{ row.storageLocation || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="在线状态" width="88">
+            <template #default="{ row }">
+              <el-tag
+                v-if="!row.__filler"
+                :type="row.status === '在线' ? 'success' : 'info'"
+                effect="light"
+                size="small"
+              >
+                {{ row.status }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="会话占用" min-width="220">
             <template #default="{ row }">
               <template v-if="!row.__filler">
-                <el-tag :type="row.status === '在线' ? 'success' : 'info'" effect="light" size="small">
-                  {{ row.status }}
-                </el-tag>
+                <div v-if="row.occupied" class="occupancy-cell">
+                  <el-tag type="warning" effect="light" size="small" class="occupancy-tag">
+                    占用中
+                  </el-tag>
+                  <el-tooltip
+                    :content="`${row.occupiedPatientName || '-'}（${row.occupiedPatientId || '-'}）`"
+                    placement="top"
+                  >
+                    <span class="occupied-detail">
+                      {{ row.occupiedPatientName || '-' }}（{{ row.occupiedPatientId || '-' }}）
+                    </span>
+                  </el-tooltip>
+                </div>
+                <span v-else class="muted">空闲</span>
               </template>
             </template>
           </el-table-column>
-          <el-table-column label="会话占用" min-width="180">
+          <el-table-column label="操作" width="160">
             <template #default="{ row }">
               <template v-if="!row.__filler">
-                <el-tag v-if="row.occupied" type="warning" effect="light" size="small">
-                  占用中
-                </el-tag>
-                <span v-else class="muted">空闲</span>
+                <el-button size="small" @click="openDeviceEdit(row)">编辑</el-button>
                 <el-tooltip
-                  v-if="row.occupied"
-                  :content="`${row.occupiedPatientName || '-'}（${row.occupiedPatientId || '-'}）`"
+                  :disabled="row.occupied"
+                  content="设备未被占用，无需强制释放"
                   placement="top"
                 >
-                  <span class="occupied-detail">
-                    {{ row.occupiedPatientName || '-' }}（{{ row.occupiedPatientId || '-' }}）
+                  <span class="button-wrapper">
+                    <el-button
+                      size="small"
+                      type="warning"
+                      :disabled="!row.occupied"
+                      @click="onForceRelease(row)"
+                    >
+                      强制释放
+                    </el-button>
                   </span>
                 </el-tooltip>
               </template>
             </template>
           </el-table-column>
-          <el-table-column prop="responsible" label="负责人" min-width="100" show-overflow-tooltip />
-          <el-table-column label="操作" width="220" fixed="right">
-            <template #default="{ row }">
-              <template v-if="!row.__filler">
-                <el-button size="small" :type="row.status === '在线' ? 'primary' : 'default'"
-                  :plain="row.status !== '在线'" :loading="togglingId === row.id"
-                  @click="onToggleConnect(row)">
-                  {{ row.status === '在线' ? '断连' : '连接' }}
-                </el-button>
-                <el-button
-                  v-if="row.occupied"
-                  size="small"
-                  type="warning"
-                  @click="onForceRelease(row)"
-                >
-                  强制释放
-                </el-button>
-                <el-button size="small" @click="openDeviceEdit(row)">编辑</el-button>
-                <el-button size="small" type="danger" @click="onDeleteDevice(row)">删除</el-button>
-              </template>
-            </template>
-          </el-table-column>
         </el-table>
 
         <div class="pagination-wrapper">
-          <el-pagination :current-page="devicePage" :page-size="PAGE_SIZE"
-            :total="deviceTotal" background size="small" layout="prev, pager, next"
-            @current-change="devicePage = $event" />
-        </div>
-      </el-card>
-
-      <!-- ─── 科室医生管理 ──────────────────────────── -->
-      <el-card shadow="hover" class="card wide">
-        <template #header>
-          <div class="card-header">科室医生管理</div>
-        </template>
-
-        <div class="controls-row">
-          <el-input v-model="docSearchId" placeholder="搜索工号" clearable size="small" style="width: 160px">
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
-          <el-input v-model="docSearchName" placeholder="搜索姓名" clearable size="small" style="width: 160px">
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
-          <el-input v-model="docSearchDept" placeholder="搜索科室" clearable size="small" style="width: 160px">
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
-          <el-input v-model="docSearchPhone" placeholder="搜索联系电话" clearable size="small" style="width: 180px">
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
-          <el-select v-model="docTitleFilter" placeholder="选择职称" clearable size="small" style="width: 160px">
-            <template #prefix><el-icon><Filter /></el-icon></template>
-            <el-option v-for="t in TITLE_OPTIONS" :key="t" :label="t" :value="t" />
-          </el-select>
-          <el-button type="primary" size="small" @click="openDoctorCreate">
-            <el-icon class="icon-with-margin"><Plus /></el-icon>添加医生
-          </el-button>
-        </div>
-
-        <el-table v-loading="docLoading" :data="doctorRows" stripe border size="small"
-          class="table" style="margin-bottom: 16px"
-          :row-class-name="docRowClassName"
-          :row-style="row35Style" :cell-style="cell35Style">
-          <el-table-column prop="id" label="工号" min-width="100" show-overflow-tooltip />
-          <el-table-column prop="name" label="姓名" min-width="100" show-overflow-tooltip />
-          <el-table-column prop="department" label="所属科室" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="title" label="职称" min-width="110" show-overflow-tooltip />
-          <el-table-column prop="phone" label="联系电话" min-width="130" show-overflow-tooltip />
-          <el-table-column label="操作" width="160">
-            <template #default="{ row }">
-              <template v-if="!row.__filler">
-                <el-button size="small" @click="openDoctorEdit(row)">编辑</el-button>
-                <el-button size="small" type="danger" @click="onDeleteDoctor(row)">删除</el-button>
-              </template>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <div class="pagination-wrapper">
-          <el-pagination :current-page="docPage" :page-size="DOC_PAGE_SIZE"
-            :total="docTotal" background size="small" layout="prev, pager, next"
-            @current-change="docPage = $event" />
+          <el-pagination
+            :current-page="devicePage"
+            :page-size="PAGE_SIZE"
+            :total="deviceTotal"
+            background
+            size="small"
+            layout="prev, pager, next"
+            @current-change="devicePage = $event"
+          />
         </div>
       </el-card>
     </div>
 
-    <!-- ─── 设备 对话框 ─────────────────────────────── -->
-    <el-dialog v-model="deviceDialogVisible"
-      :title="deviceDialogMode === 'create' ? '添加设备' : '编辑设备'"
-      width="520px" :close-on-click-modal="false" @closed="resetDeviceForm">
-      <el-form ref="deviceFormRef" :model="deviceForm" :rules="deviceRules"
-        label-width="100px" size="small">
+    <el-dialog
+      v-model="deviceDialogVisible"
+      title="编辑设备"
+      width="640px"
+      :close-on-click-modal="false"
+      @closed="onDeviceDialogClosed"
+    >
+      <el-form ref="deviceFormRef" :model="deviceForm" :rules="deviceRules" label-width="128px" class="device-form">
+        <el-form-item label="资产编号">
+          <el-input :model-value="deviceReadonly.id" disabled />
+        </el-form-item>
+        <el-form-item label="当前 IP">
+          <el-input :model-value="deviceReadonly.ip || '-'" disabled />
+        </el-form-item>
+        <el-form-item label="在线状态">
+          <el-input :model-value="deviceReadonly.status || '-'" disabled />
+        </el-form-item>
         <el-form-item label="设备名称" prop="name">
           <el-input v-model="deviceForm.name" placeholder="如：吞咽记录仪 A1" />
         </el-form-item>
         <el-form-item label="硬件标识">
-          <el-input v-model="deviceForm.hardwareId" placeholder="MAC / 序列号，用于固定识别设备" />
+          <el-input :model-value="deviceReadonly.hardwareId || '-'" disabled />
+          <div class="form-tip">
+            由系统发现服务维护，通常来自 MAC 地址、序列号或设备 ID，不支持手动修改。
+          </div>
         </el-form-item>
-        <el-form-item label="当前IP" prop="ip">
-          <el-input v-model="deviceForm.ip" placeholder="局域网当前地址，可由发现服务自动更新" />
+        <el-form-item label="保管/部署位置">
+          <el-input v-model="deviceForm.storageLocation" placeholder="如：康复医学科治疗室" />
         </el-form-item>
-        <el-form-item label="设备状态" prop="status">
-          <el-select v-model="deviceForm.status" style="width: 100%">
-            <el-option label="在线" value="在线" />
-            <el-option label="离线" value="离线" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="保管地点">
-          <el-input v-model="deviceForm.storageLocation" placeholder="如：一号设备间" />
-        </el-form-item>
-        <el-form-item label="负责人">
-          <el-input v-model="deviceForm.responsible" placeholder="如：王医生" />
-        </el-form-item>
-        <el-form-item label="上次连接时间">
-          <el-date-picker v-model="deviceConnectedTime" type="datetime"
-            placeholder="选择时间（可选）" style="width: 100%"
-            :disabled-date="disabledFuture" />
-        </el-form-item>
-        <el-form-item label="设备描述">
-          <el-input v-model="deviceForm.description" type="textarea" :rows="2"
-            placeholder="设备描述信息" />
+        <el-form-item label="备注">
+          <el-input v-model="deviceForm.description" type="textarea" :rows="3" placeholder="设备备注信息" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="deviceDialogVisible = false">取消</el-button>
+        <el-button @click="resetDeviceDialogContent">恢复原值</el-button>
         <el-button type="primary" :loading="deviceSubmitting" @click="submitDevice">确认</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- ─── 医生 对话框 ─────────────────────────────── -->
-    <el-dialog v-model="doctorDialogVisible"
-      :title="doctorDialogMode === 'create' ? '添加医生' : '编辑医生'"
-      width="480px" :close-on-click-modal="false" @closed="resetDoctorForm">
-      <el-form ref="doctorFormRef" :model="doctorForm" :rules="doctorRules"
-        label-width="90px" size="small">
-        <el-form-item label="姓名" prop="name">
-          <el-input v-model="doctorForm.name" placeholder="如：王医生" />
-        </el-form-item>
-        <el-form-item label="所属科室">
-          <el-input v-model="doctorForm.department" placeholder="如：神经内科" />
-        </el-form-item>
-        <el-form-item label="职称">
-          <el-select v-model="doctorForm.title" placeholder="请选择职称" clearable style="width: 100%">
-            <el-option v-for="t in TITLE_OPTIONS" :key="t" :label="t" :value="t" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="联系电话">
-          <el-input v-model="doctorForm.phone" placeholder="11位手机号" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="doctorDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="doctorSubmitting" @click="submitDoctor">确认</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Link, Location, Filter } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
-import type { DeviceRow, DoctorRow } from '@/types/department'
-import {
-  listDevices, getDeviceLocations, createDevice, updateDevice, deleteDevice, toggleDeviceStatus, forceReleaseDeviceLock,
-  listDoctors, createDoctor, updateDoctor, deleteDoctor,
-} from '@/api/department'
+import { Box, CircleCheck, Connection, Link, Location, Refresh, Search } from '@element-plus/icons-vue'
+import type { DeviceFormData, DeviceRow } from '@/types/department'
+import { forceReleaseDeviceLock, getDeviceLocations, listDevices, updateDevice } from '@/api/department'
+import { quickDeviceDiscovery } from '@/api/device'
 
-// ─── 常量 ──────────────────────────────────────────────────────────────────
-const PAGE_SIZE = 8
-const DOC_PAGE_SIZE = 8
-const DEVICE_MAX_FILLER_ROWS = 3
-const DOCTOR_MAX_FILLER_ROWS = 5
-const TITLE_OPTIONS = ['主任医师', '副主任医师', '主治医师', '住院医师']
+const PAGE_SIZE = 5
+const DEVICE_MAX_FILLER_ROWS = PAGE_SIZE
 
-// ─── 通用辅助 ───────────────────────────────────────────────────────────────
-function row35Style() { return { height: '35px' } }
-function cell35Style() {
-  return { paddingTop: '0px', paddingBottom: '0px', height: '35px', lineHeight: '35px' }
-}
-function disabledFuture(date: Date) {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  return date.getTime() > today.getTime()
-}
-function toIsoLocal(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-}
-function fillerRows<T>(data: T[], size: number, maxFillers: number): any[] {
-  const pad = Math.min(size - data.length, maxFillers)
-  if (pad <= 0) return data as any[]
-  return (data as any[]).concat(Array.from({ length: pad }, (_, i) => ({ __filler: true, __key: i })))
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 设备信息
-// ══════════════════════════════════════════════════════════════════════════════
 const deviceLoading = ref(false)
+const refreshingStatus = ref(false)
 const deviceData = ref<DeviceRow[]>([])
 const deviceTotal = ref(0)
 const devicePage = ref(1)
 const deviceSearchId = ref('')
 const deviceSearchName = ref('')
-const deviceSearchOwner = ref('')
 const deviceStatusFilter = ref('')
 const deviceLocationFilter = ref('')
 const locationOptions = ref<string[]>([])
-const togglingId = ref<string | null>(null)
 
 const deviceRows = computed(() => fillerRows(deviceData.value, PAGE_SIZE, DEVICE_MAX_FILLER_ROWS))
-function deviceRowClassName({ row }: { row: any }) { return row.__filler ? 'is-filler' : '' }
+const onlineCount = computed(() => deviceData.value.filter((row) => row.status === '在线').length)
+const occupiedCount = computed(() => deviceData.value.filter((row) => row.occupied).length)
+const registeredPercentage = computed(() => (deviceTotal.value > 0 ? 100 : 0))
+const onlinePercentage = computed(() => {
+  if (!deviceTotal.value) return 0
+  return Math.round((onlineCount.value / deviceTotal.value) * 100)
+})
+const occupiedPercentage = computed(() => {
+  if (!deviceTotal.value) return 0
+  return Math.round((occupiedCount.value / deviceTotal.value) * 100)
+})
 
-async function fetchDevices() {
-  deviceLoading.value = true
+const deviceDialogVisible = ref(false)
+const deviceEditingId = ref('')
+const deviceSubmitting = ref(false)
+const deviceFormRef = ref<FormInstance>()
+const deviceEditOriginal = ref<DeviceFormState | null>(null)
+const deviceReadonly = ref({
+  id: '',
+  ip: '',
+  status: '',
+  hardwareId: '',
+  occupied: false,
+})
+
+type DeviceFormState = {
+  name: string
+  description: string
+  storageLocation: string
+}
+
+function emptyDeviceForm(): DeviceFormState {
+  return {
+    name: '',
+    description: '',
+    storageLocation: '',
+  }
+}
+
+const deviceForm = ref<DeviceFormState>(emptyDeviceForm())
+const deviceRules = {
+  name: [{ required: true, message: '请输入设备名称', trigger: 'blur' }],
+}
+
+onMounted(() => {
+  fetchDevices()
+  fetchLocations()
+})
+
+watch(devicePage, () => fetchDevices())
+watch([deviceSearchId, deviceSearchName, deviceStatusFilter, deviceLocationFilter], () => {
+  devicePage.value = 1
+  fetchDevices()
+})
+
+function row35Style() {
+  return { height: '35px' }
+}
+
+function cell35Style() {
+  return { paddingTop: '0px', paddingBottom: '0px', height: '35px', lineHeight: '35px' }
+}
+
+function fillerRows<T>(data: T[], size: number, maxFillers: number): Array<T | { __filler: true; __key: number }> {
+  const pad = Math.min(size - data.length, maxFillers)
+  if (pad <= 0) return data
+  return data.concat(Array.from({ length: pad }, (_, i) => ({ __filler: true, __key: i }) as T))
+}
+
+function deviceRowClassName({ row }: { row: DeviceRow & { __filler?: boolean } }) {
+  return row.__filler ? 'is-filler' : ''
+}
+
+async function fetchDevices(options: { silent?: boolean } = {}) {
+  if (!options.silent) {
+    deviceLoading.value = true
+  }
   try {
     const data = await listDevices({
-      page: devicePage.value, size: PAGE_SIZE,
+      page: devicePage.value,
+      size: PAGE_SIZE,
       id: deviceSearchId.value || undefined,
       name: deviceSearchName.value || undefined,
-      responsible: deviceSearchOwner.value || undefined,
       status: deviceStatusFilter.value || undefined,
       storageLocation: deviceLocationFilter.value || undefined,
     })
     deviceData.value = data.items
     deviceTotal.value = data.total
   } finally {
-    deviceLoading.value = false
+    if (!options.silent) {
+      deviceLoading.value = false
+    }
   }
 }
 
 async function fetchLocations() {
-  try { locationOptions.value = await getDeviceLocations() } catch { /**/ }
+  try {
+    locationOptions.value = await getDeviceLocations()
+  } catch {
+    locationOptions.value = []
+  }
 }
 
-onMounted(() => { fetchDevices(); fetchLocations(); fetchDoctors() })
-
-watch(devicePage, fetchDevices)
-watch([deviceSearchId, deviceSearchName, deviceSearchOwner, deviceStatusFilter, deviceLocationFilter], () => {
-  devicePage.value = 1; fetchDevices()
-})
-
-// 连接/断连
-async function onToggleConnect(row: DeviceRow) {
-  togglingId.value = row.id
+async function refreshDevices() {
+  refreshingStatus.value = true
   try {
-    const updated = await toggleDeviceStatus(row.id)
-    const idx = deviceData.value.findIndex(d => d.id === row.id)
-    if (idx !== -1) deviceData.value[idx] = updated as DeviceRow
-    ElMessage.success(updated.status === '在线' ? `已连接：${row.name}` : `已断连：${row.name}`)
-    fetchLocations()
-  } catch (e: any) {
-    ElMessage.error(e?.message ?? '操作失败')
+    const discoveredDevice = await quickDeviceDiscovery()
+    if (discoveredDevice?.status === 'ONLINE') {
+      ElMessage.success(`发现在线设备：${discoveredDevice.deviceName || discoveredDevice.deviceIp || discoveredDevice.deviceId}`)
+    } else {
+      ElMessage.warning('未发现在线设备，已刷新设备状态')
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : ''
+    if (message.includes('未发现设备')) {
+      ElMessage.warning('未发现在线设备，已将未响应设备标记为离线')
+    } else {
+      ElMessage.error(message || '刷新设备状态失败')
+    }
   } finally {
-    togglingId.value = null
+    try {
+      await fetchDevices({ silent: true })
+      await fetchLocations()
+    } finally {
+      refreshingStatus.value = false
+    }
+  }
+}
+
+function openDeviceEdit(row: DeviceRow) {
+  deviceEditingId.value = row.id
+  deviceReadonly.value = {
+    id: row.id,
+    ip: row.ip || '',
+    status: row.status || '',
+    hardwareId: row.hardwareId || '',
+    occupied: Boolean(row.occupied),
+  }
+  const form = {
+    name: row.name ?? '',
+    description: row.description ?? '',
+    storageLocation: row.storageLocation ?? '',
+  }
+  deviceEditOriginal.value = { ...form }
+  applyDeviceForm(form)
+  deviceDialogVisible.value = true
+}
+
+function applyDeviceForm(form: DeviceFormState | null) {
+  deviceForm.value = { ...(form ?? emptyDeviceForm()) }
+  nextTick(() => deviceFormRef.value?.clearValidate())
+}
+
+function resetDeviceDialogContent() {
+  if (deviceEditOriginal.value) {
+    applyDeviceForm(deviceEditOriginal.value)
+  }
+}
+
+function onDeviceDialogClosed() {
+  deviceEditOriginal.value = null
+  applyDeviceForm(null)
+  deviceReadonly.value = { id: '', ip: '', status: '', hardwareId: '', occupied: false }
+}
+
+async function submitDevice() {
+  const valid = await deviceFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+
+  const dto: DeviceFormData = {
+    name: deviceForm.value.name.trim(),
+    description: deviceForm.value.description.trim(),
+    storageLocation: deviceForm.value.storageLocation.trim(),
+  }
+
+  deviceSubmitting.value = true
+  try {
+    await updateDevice(deviceEditingId.value, dto)
+    ElMessage.success('设备信息已更新')
+    deviceDialogVisible.value = false
+    await refreshDevices()
+  } catch (e: unknown) {
+    ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  } finally {
+    deviceSubmitting.value = false
   }
 }
 
 async function onForceRelease(row: DeviceRow) {
+  if (!row.occupied) return
   try {
-    await ElMessageBox.confirm(`确认强制释放设备【${row.name}】当前占用会话？`, '强制释放确认', { type: 'warning' })
+    await ElMessageBox.confirm(
+      `确认通知正在使用【${row.name}】的检测端停止检测并释放设备？`,
+      '强制释放确认',
+      {
+        type: 'warning',
+        confirmButtonText: '发送释放请求',
+        cancelButtonText: '取消',
+      },
+    )
   } catch {
     return
   }
 
   try {
     await forceReleaseDeviceLock(row.id)
-    ElMessage.success('设备占用已强制释放')
-    fetchDevices()
-  } catch (e: any) {
-    ElMessage.error(e?.message ?? '强制释放失败')
-  }
-}
-
-// 删除
-async function onDeleteDevice(row: DeviceRow) {
-  try {
-    await ElMessageBox.confirm(`确认删除设备【${row.name}】？`, '删除确认', { type: 'warning' })
-  } catch { return }
-  try {
-    await deleteDevice(row.id)
-    ElMessage.success('删除成功')
-    fetchDevices(); fetchLocations()
-  } catch (e: any) { ElMessage.error(e?.message ?? '删除失败') }
-}
-
-// ─── 设备对话框 ────────────────────────────────────────────────────────────
-const deviceDialogVisible = ref(false)
-const deviceDialogMode = ref<'create' | 'edit'>('create')
-const deviceEditingId = ref('')
-const deviceSubmitting = ref(false)
-const deviceFormRef = ref<FormInstance>()
-const deviceConnectedTime = ref<Date | null>(null)
-const deviceForm = ref({ name: '', ip: '', hardwareId: '', status: '离线', description: '', storageLocation: '', responsible: '' })
-const deviceRules = {
-  name:   [{ required: true, message: '请输入设备名称', trigger: 'blur' }],
-  status: [{ required: true, message: '请选择设备状态', trigger: 'change' }],
-}
-
-function resetDeviceForm() {
-  deviceForm.value = { name: '', ip: '', hardwareId: '', status: '离线', description: '', storageLocation: '', responsible: '' }
-  deviceConnectedTime.value = null
-  deviceFormRef.value?.clearValidate()
-}
-function openDeviceCreate() {
-  resetDeviceForm(); deviceDialogMode.value = 'create'; deviceDialogVisible.value = true
-}
-function openDeviceEdit(row: DeviceRow) {
-  resetDeviceForm()
-  deviceForm.value = {
-    name: row.name ?? '',
-    ip: row.ip ?? '',
-    hardwareId: row.hardwareId ?? '',
-    status: row.status ?? '离线',
-    description: row.description ?? '',
-    storageLocation: row.storageLocation ?? '',
-    responsible: row.responsible ?? '',
-  }
-  deviceConnectedTime.value = row.lastConnectedTime ? new Date(row.lastConnectedTime.replace(' ', 'T')) : null
-  deviceEditingId.value = row.id
-  deviceDialogMode.value = 'edit'
-  deviceDialogVisible.value = true
-}
-async function submitDevice() {
-  const valid = await deviceFormRef.value?.validate().catch(() => false)
-  if (!valid) return
-  const dto = {
-    ...deviceForm.value,
-    // 后端/DB 可能对 lastConnectedTime 有非空约束：
-    // 用户不选择时间时，为避免 POST /api/device 直接 500，这里用当前时间兜底。
-    lastConnectedTime: deviceConnectedTime.value
-      ? toIsoLocal(deviceConnectedTime.value)
-      : toIsoLocal(new Date()),
-  }
-  deviceSubmitting.value = true
-  try {
-    if (deviceDialogMode.value === 'create') {
-      await createDevice(dto as any)
-      ElMessage.success('添加成功')
-    } else {
-      await updateDevice(deviceEditingId.value, dto as any)
-      ElMessage.success('编辑成功')
-    }
-    deviceDialogVisible.value = false
-    fetchDevices(); fetchLocations()
-  } catch (e: any) {
-    ElMessage.error(e?.message ?? '操作失败')
-  } finally {
-    deviceSubmitting.value = false
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 科室医生管理
-// ══════════════════════════════════════════════════════════════════════════════
-const docLoading = ref(false)
-const doctorData = ref<DoctorRow[]>([])
-const docTotal = ref(0)
-const docPage = ref(1)
-const docSearchId = ref('')
-const docSearchName = ref('')
-const docSearchDept = ref('')
-const docSearchPhone = ref('')
-const docTitleFilter = ref('')
-
-const doctorRows = computed(() => fillerRows(doctorData.value, DOC_PAGE_SIZE, DOCTOR_MAX_FILLER_ROWS))
-function docRowClassName({ row }: { row: any }) { return row.__filler ? 'is-filler' : '' }
-
-async function fetchDoctors() {
-  docLoading.value = true
-  try {
-    const data = await listDoctors({
-      page: docPage.value, size: DOC_PAGE_SIZE,
-      id: docSearchId.value || undefined,
-      name: docSearchName.value || undefined,
-      department: docSearchDept.value || undefined,
-      phone: docSearchPhone.value || undefined,
-      title: docTitleFilter.value || undefined,
-    })
-    doctorData.value = data.items
-    docTotal.value = data.total
-  } finally {
-    docLoading.value = false
-  }
-}
-
-watch(docPage, fetchDoctors)
-watch([docSearchId, docSearchName, docSearchDept, docSearchPhone, docTitleFilter], () => {
-  docPage.value = 1; fetchDoctors()
-})
-
-// 删除
-async function onDeleteDoctor(row: DoctorRow) {
-  try {
-    await ElMessageBox.confirm(`确认删除医生【${row.name}】？`, '删除确认', { type: 'warning' })
-  } catch { return }
-  try {
-    await deleteDoctor(row.id)
-    ElMessage.success('删除成功')
-    fetchDoctors()
-  } catch (e: any) { ElMessage.error(e?.message ?? '删除失败') }
-}
-
-// ─── 医生对话框 ────────────────────────────────────────────────────────────
-const doctorDialogVisible = ref(false)
-const doctorDialogMode = ref<'create' | 'edit'>('create')
-const doctorEditingId = ref('')
-const doctorSubmitting = ref(false)
-const doctorFormRef = ref<FormInstance>()
-const doctorForm = ref({ name: '', department: '', title: '', phone: '' })
-const doctorRules = {
-  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-}
-
-function resetDoctorForm() {
-  doctorForm.value = { name: '', department: '', title: '', phone: '' }
-  doctorFormRef.value?.clearValidate()
-}
-function openDoctorCreate() {
-  resetDoctorForm(); doctorDialogMode.value = 'create'; doctorDialogVisible.value = true
-}
-function openDoctorEdit(row: DoctorRow) {
-  resetDoctorForm()
-  doctorForm.value = {
-    name: row.name ?? '',
-    department: row.department ?? '',
-    title: row.title ?? '',
-    phone: row.phone ?? '',
-  }
-  doctorEditingId.value = row.id
-  doctorDialogMode.value = 'edit'
-  doctorDialogVisible.value = true
-}
-async function submitDoctor() {
-  const valid = await doctorFormRef.value?.validate().catch(() => false)
-  if (!valid) return
-  doctorSubmitting.value = true
-  try {
-    if (doctorDialogMode.value === 'create') {
-      await createDoctor(doctorForm.value)
-      ElMessage.success('添加成功')
-    } else {
-      await updateDoctor(doctorEditingId.value, doctorForm.value)
-      ElMessage.success('编辑成功')
-    }
-    doctorDialogVisible.value = false
-    fetchDoctors()
-  } catch (e: any) {
-    ElMessage.error(e?.message ?? '操作失败')
-  } finally {
-    doctorSubmitting.value = false
+    ElMessage.success('已向占用端发送强制释放请求')
+    await fetchDevices()
+  } catch (e: unknown) {
+    ElMessage.error(e instanceof Error ? e.message : '强制释放失败')
   }
 }
 </script>
 
 <style scoped>
-.system-container {
+.device-page {
   width: 100%;
   display: flex;
   justify-content: center;
 }
-.grid-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  width: 1304px;
+.device-shell {
+  width: min(1304px, calc(100vw - 260px));
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 24px;
 }
-.card {
+.stat-card,
+.table-card {
   width: 100%;
-  padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 22px rgba(31, 41, 55, 0.08);
+}
+.stat-card {
+  position: relative;
+  min-height: 152px;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: #2f7df6;
+}
+.stat-card-online::before {
+  background: #67c23a;
+}
+.stat-card-occupied::before {
+  background: #e6a23c;
+}
+.stat-card :deep(.el-card__body) {
+  height: 100%;
+  padding: 24px;
+}
+.table-card {
+  grid-column: 1 / -1;
+}
+.table-card :deep(.el-card__body) {
+  padding: 18px 20px 20px;
+}
+.stat-head {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.stat-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #2f7df6;
+  background: #ecf5ff;
+  font-size: 18px;
+}
+.stat-card-online .stat-icon {
+  color: #3a9f2f;
+  background: #edf8e9;
+}
+.stat-card-occupied .stat-icon {
+  color: #b7791f;
+  background: #fff7e6;
+}
+.stat-title {
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 650;
+}
+.stat-number {
+  margin-top: 18px;
+}
+.stat-number :deep(.el-statistic__number) {
+  color: #1f2937;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+}
+.stat-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: #606266;
+  font-size: 13px;
+}
+.stat-progress {
+  margin-top: 10px;
 }
 .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   font-size: 1.2rem;
   font-weight: 600;
 }
 :deep(.el-card__header) {
-  padding: 6px 0px;
-}
-.table {
-  width: 100%;
-}
-.pagination-wrapper {
-  display: flex;
-  justify-content: center;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid #e5e7eb;
 }
 .controls-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) max-content;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   align-items: center;
   margin-bottom: 12px;
-  gap: 8px;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 6px;
 }
 .controls-row > :deep(.el-input),
 .controls-row > :deep(.el-select) {
   width: 100% !important;
-  max-width: none !important;
   min-width: 0;
+}
+.table {
+  width: 100%;
+  margin-bottom: 16px;
+}
+:deep(.table .el-table__header th) {
+  color: #606f7b;
+  background: #f8fafc;
+  font-weight: 650;
+}
+:deep(.table .cell) {
+  white-space: nowrap;
+}
+.button-wrapper {
+  display: inline-flex;
+  margin-left: 8px;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
 }
 .icon-with-margin {
   margin-right: 4px;
@@ -583,24 +610,48 @@ async function submitDoctor() {
 .muted {
   color: #909399;
 }
+.occupancy-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.occupancy-tag {
+  flex: 0 0 auto;
+}
 .occupied-detail {
-  display: inline-block;
-  max-width: calc(100% - 52px);
-  margin-left: 6px;
-  vertical-align: middle;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
   color: #e6a23c;
 }
+.device-form :deep(.el-input),
+.device-form :deep(.el-textarea) {
+  font-size: 14px;
+}
+.form-tip {
+  margin-top: 4px;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.4;
+}
 :deep(.el-table__body tr.is-filler .cell) {
   visibility: hidden;
   pointer-events: none;
 }
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
+  .device-shell {
+    width: 100%;
+  }
+  .device-shell,
   .controls-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .table-card {
+    grid-column: 1 / -1;
   }
 }
 </style>

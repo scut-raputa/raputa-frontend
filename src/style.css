@@ -10,3 +10,98 @@ body {
   background-color: #fff;
   color: #000;
 }
+
+:root {
+  --raputa-card-radius: 6px;
+  --raputa-card-border: #e5e7eb;
+  --raputa-card-shadow: 0 8px 22px rgba(31, 41, 55, 0.08);
+  --raputa-card-title-size: 20px;
+  --raputa-card-title-weight: 650;
+  --raputa-toolbar-bg: #f8fafc;
+  --raputa-toolbar-border: #edf2f7;
+  --raputa-table-head-bg: #f8fafc;
+  --raputa-table-head-color: #606f7b;
+}
+
+body .el-card.card,
+body .el-card.table-card,
+body .el-card.overview-card {
+  padding: 0;
+  border-radius: var(--raputa-card-radius);
+  border: 1px solid var(--raputa-card-border);
+  box-shadow: var(--raputa-card-shadow);
+}
+
+body .el-card.card > .el-card__header,
+body .el-card.table-card > .el-card__header,
+body .el-card.overview-card > .el-card__header {
+  padding: 28px 20px 8px;
+  border-bottom: 1px solid var(--raputa-card-border);
+}
+
+body .el-card .card-header,
+body .el-card .card-header-row .card-header,
+body .el-card .page-card-header h2,
+body .el-card .section-title {
+  color: #1f2937;
+  font-size: var(--raputa-card-title-size);
+  font-weight: var(--raputa-card-title-weight);
+  line-height: 1.35;
+}
+
+body .el-card .controls-row,
+body .el-card .filter-row,
+body .el-card .console-row,
+body .el-card .patient-controls-row,
+body .el-card .setting-row {
+  padding: 10px;
+  background: var(--raputa-toolbar-bg);
+  border: 1px solid var(--raputa-toolbar-border);
+  border-radius: var(--raputa-card-radius);
+}
+
+body .el-card .toolbar-panel {
+  padding: 10px;
+  background: var(--raputa-toolbar-bg);
+  border: 1px solid var(--raputa-toolbar-border);
+  border-radius: var(--raputa-card-radius);
+}
+
+body .el-card .toolbar-panel .controls-row,
+body .el-card .toolbar-panel .filter-row,
+body .el-card .toolbar-panel .console-row,
+body .el-card .toolbar-panel .patient-controls-row,
+body .el-card .toolbar-panel .setting-row {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+body .el-card .controls-row > .el-input,
+body .el-card .controls-row > .el-select,
+body .el-card .controls-row > .el-select-v2,
+body .el-card .controls-row > .el-date-editor,
+body .el-card .filter-row > .el-input,
+body .el-card .filter-row > .el-select,
+body .el-card .filter-row > .el-select-v2,
+body .el-card .filter-row > .el-date-editor,
+body .el-card .console-row > .el-input,
+body .el-card .console-row > .el-select,
+body .el-card .console-row > .el-select-v2,
+body .el-card .console-row > .el-date-editor,
+body .el-card .patient-controls-row > .el-input,
+body .el-card .patient-controls-row > .el-select,
+body .el-card .patient-controls-row > .el-date-editor,
+body .el-card .setting-row > .el-input,
+body .el-card .setting-row > .el-select,
+body .el-card .setting-row > .el-select-v2 {
+  width: 100% !important;
+  min-width: 0;
+}
+
+body .el-table .el-table__header th.el-table__cell {
+  color: var(--raputa-table-head-color);
+  background: var(--raputa-table-head-bg);
+  font-weight: 650;
+}

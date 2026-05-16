@@ -40,19 +40,21 @@
               </el-tooltip>
 
               <el-tooltip
-                content="仅在检测过程中启用"
+                :content="stopTooltipContent"
                 placement="top"
-                :disabled="isDetecting"
+                :disabled="stopTooltipDisabled"
               >
-                <el-button
-                  type="danger"
-                  size="small"
-                  :disabled="!isDetecting"
-                  @click="stopDetection"
-                >
-                  <el-icon style="margin-right: 4px"><VideoPause /></el-icon>
-                  停止检测
-                </el-button>
+                <span class="stop-button-wrapper" @click="handleStopButtonClick">
+                  <el-button
+                    type="danger"
+                    size="small"
+                    :disabled="!canStopDetection"
+                    @click.stop="stopDetection"
+                  >
+                    <el-icon style="margin-right: 4px"><VideoPause /></el-icon>
+                    停止检测
+                  </el-button>
+                </span>
               </el-tooltip>
 
               <el-tooltip
@@ -93,6 +95,7 @@
           placeholder="请选择检测任务"
           size="small"
           class="setting-item task-select"
+          :disabled="isDetecting || hasStopped"
           @change="onTaskManualChange"
         >
           <template #prefix>
@@ -102,32 +105,53 @@
           <el-option label="误吸" value="asp" />
         </el-select>
 
+        <el-select
+          v-model="selectedSubjectType"
+          placeholder="请选择受试者身份"
+          size="small"
+          class="setting-item subject-type-select"
+          :disabled="isDetecting || hasStopped"
+          clearable
+          @change="onSubjectTypeChange"
+          @clear="onSubjectTypeClear"
+        >
+          <template #prefix>
+            <el-icon><User /></el-icon>
+          </template>
+          <el-option label="预约者" value="APPOINTMENT" />
+          <el-option label="患者" value="PATIENT" />
+        </el-select>
+
         <el-select-v2
           v-model="selectedPatientId"
           class="setting-item subject-select"
-          :options="patientOptions"
+          :options="subjectOptions"
           :remote="true"
           :loading="patientLoading"
           :remote-method="remotePatientQuery"
           size="small"
           filterable
           clearable
-          placeholder="请选择患者或预约者"
+          placeholder="请选择受试者"
+          :disabled="!selectedSubjectType || isDetecting || hasStopped"
           :item-height="64"
           :height="320"
           popper-class="subject-select-popper"
           @visible-change="onPatientSelectVisible"
-          @clear="() => { patientOptions = []; fetchPatients('') }"
+          @clear="clearSubjectSelection"
         >
           <template #prefix>
             <el-icon><User /></el-icon>
+          </template>
+          <template #empty>
+            <el-empty class="subject-empty" :image-size="130" description="无匹配受试者" />
           </template>
           <template #default="{ item }">
             <div class="subject-option">
               <div class="subject-main">
                 <span class="subject-name">{{ item.name }}</span>
                 <el-tag size="small" :type="item.type === 'PATIENT' ? 'success' : 'warning'" effect="plain">
-                  {{ item.type === 'PATIENT' ? '患者' : '预约' }}
+                  {{ item.type === 'PATIENT' ? '患者' : '预约者' }}
                 </el-tag>
               </div>
               <div class="subject-sub" :title="`${item.id}${item.dept ? ' / ' + item.dept : ''}`">
@@ -333,7 +357,7 @@
               <el-switch
                 v-model="manualSegmentationEnabled"
                 size="small"
-                :disabled="isDetecting && manualSwallowActive"
+                :disabled="isDetecting && (manualSwallowActive || manualSwallowResultPending)"
                 @change="handleSegmentationModeChange"
               />
               <span>手动分割吞咽段</span>
@@ -563,6 +587,7 @@
       </el-row>
     </el-form>
     <template #footer>
+      <el-button @click="resetArchiveEditableFields">恢复默认</el-button>
       <el-button type="primary" :loading="archiveSubmitting" @click="submitScreeningArchive">
         建档并归档
       </el-button>
@@ -706,6 +731,7 @@
     <!-- 弹窗底部按钮 -->
     <template #footer>
       <el-button @click="csvConfigDialogVisible = false">取消</el-button>
+      <el-button @click="resetCsvConfigFormToDefaults">重置配置</el-button>
       <el-button type="primary" @click="submitCsvConfig"
         >确认配置并渲染</el-button
       >
@@ -760,8 +786,7 @@ import { listAppointments } from '@/api/appointment'
 import type { AppointmentRow } from '@/types/appointment'
 import { listDevices } from '@/api/department'
 import type { DeviceRow } from '@/types/department'
-import { getRuntimeSummary } from '@/api/model'
-import type { RuntimeSummary } from '@/types/model'
+import { listRuntimeModels } from '@/api/model'
 import {
   archiveScreeningRecord,
   createScreeningRecord,
@@ -806,7 +831,16 @@ function appointmentSubjectValue(id: string) {
 
 const patientLoading = ref(false)
 const patientOptions = ref<PatientOption[]>([])
+const selectedSubjectType = ref<SubjectType | ''>('')
 const selectedPatientId = ref<string>('')
+const loadedSubjectQueryKey = ref('')
+let inFlightSubjectQueryKey = ''
+let subjectFetchSeq = 0
+
+const subjectOptions = computed(() => {
+  if (!selectedSubjectType.value) return []
+  return patientOptions.value.filter(option => option.type === selectedSubjectType.value)
+})
 
 const selectedSubject = computed(() => {
   return patientOptions.value.find(o => o.value === selectedPatientId.value) ?? null
@@ -964,7 +998,7 @@ function toPatientOption(p: any): PatientOption {
 function toAppointmentOption(a: AppointmentRow): PatientOption {
   return {
     value: appointmentSubjectValue(a.id),
-    label: `预约 | ${a.id} - ${a.name}`,
+    label: `预约者 | ${a.id} - ${a.name}`,
     id: a.id,
     name: a.name,
     dept: a.dept,
@@ -975,6 +1009,16 @@ function toAppointmentOption(a: AppointmentRow): PatientOption {
     time: a.time,
     type: 'APPOINTMENT',
   }
+}
+
+function subjectQueryKey(type: SubjectType, keyword = '') {
+  return `${type}:${keyword.trim()}`
+}
+
+function resetSubjectOptionLoadState() {
+  loadedSubjectQueryKey.value = ''
+  inFlightSubjectQueryKey = ''
+  subjectFetchSeq += 1
 }
 
 const checkRecordsSaved = ref(false)
@@ -1045,56 +1089,97 @@ async function persistCheckRecords(): Promise<boolean> {
 // —— 稳妥版：分别按 id 和 name 搜，合并结果 ——
 // keyword 为空时只拉最近一页（按 admit desc, id desc）
 async function fetchPatients(keyword = '') {
+  const subjectType = selectedSubjectType.value
+  if (!subjectType) {
+    patientOptions.value = []
+    return
+  }
+
+  const normalizedKeyword = keyword.trim()
+  const queryKey = subjectQueryKey(subjectType, normalizedKeyword)
+  if (loadedSubjectQueryKey.value === queryKey || inFlightSubjectQueryKey === queryKey) {
+    return
+  }
+
+  const requestSeq = ++subjectFetchSeq
+  inFlightSubjectQueryKey = queryKey
   patientLoading.value = true
   try {
     const base = { page: 1, size: 100 }
     const apptBase = { page: 1, size: 100 }
+    let options: PatientOption[] = []
 
-    // 空关键字：拉最近患者 + 今日预约，供系统监测选择筛查对象
-    if (!keyword.trim()) {
-      const [patientPage, appointmentPage] = await Promise.all([
-        listPatients(base),
-        listAppointments(apptBase),
-      ])
-      const patientItems = patientPage.items ?? []
-      const appointmentItems = appointmentPage.items ?? []
-      patientOptions.value = [
-        ...patientItems.map(toPatientOption),
-        ...appointmentItems.map(toAppointmentOption),
-      ]
-      return
+    // 空关键字：按受试者身份拉一页，供系统监测选择筛查对象
+    if (!normalizedKeyword) {
+      if (subjectType === 'PATIENT') {
+        const patientPage = await listPatients(base)
+        options = (patientPage.items ?? []).map(toPatientOption)
+      } else {
+        const appointmentPage = await listAppointments(apptBase)
+        options = (appointmentPage.items ?? []).map(toAppointmentOption)
+      }
+    } else {
+      // 非空：按当前受试者身份分别用 id/name 搜
+      if (subjectType === 'PATIENT') {
+        const [byIdPage, byNamePage] = await Promise.all([
+          listPatients({ ...base, id: normalizedKeyword }),
+          listPatients({ ...base, name: normalizedKeyword }),
+        ])
+        const merged = mergeById(byIdPage.items ?? [], byNamePage.items ?? [])
+        options = merged.map(toPatientOption)
+      } else {
+        const [apptByIdPage, apptByNamePage] = await Promise.all([
+          listAppointments({ ...apptBase, id: normalizedKeyword }),
+          listAppointments({ ...apptBase, name: normalizedKeyword }),
+        ])
+        const apptMerged = mergeById(apptByIdPage.items ?? [], apptByNamePage.items ?? [])
+        options = apptMerged.map(toAppointmentOption)
+      }
     }
 
-    // 非空：患者按 id/name 搜，预约按 id/name 搜
-    const kw = keyword.trim()
-    const [byIdPage, byNamePage, apptByIdPage, apptByNamePage] = await Promise.all([
-      listPatients({ ...base, id: kw }),
-      listPatients({ ...base, name: kw }),
-      listAppointments({ ...apptBase, id: kw }),
-      listAppointments({ ...apptBase, name: kw }),
-    ])
+    if (requestSeq !== subjectFetchSeq || selectedSubjectType.value !== subjectType) return
 
-    const itemsId = byIdPage.items ?? []
-    const itemsName = byNamePage.items ?? []
-    const merged = mergeById(itemsId, itemsName)
-    const apptMerged = mergeById(apptByIdPage.items ?? [], apptByNamePage.items ?? [])
-
-    patientOptions.value = [
-      ...merged.map(toPatientOption),
-      ...apptMerged.map(toAppointmentOption),
-    ]
+    patientOptions.value = options
+    loadedSubjectQueryKey.value = queryKey
   } catch (e: any) {
+    if (requestSeq !== subjectFetchSeq) return
     ElMessage.error(e?.message || '筛查对象列表加载失败')
     patientOptions.value = []
+    loadedSubjectQueryKey.value = ''
   } finally {
-    patientLoading.value = false
+    if (requestSeq === subjectFetchSeq) {
+      inFlightSubjectQueryKey = ''
+      patientLoading.value = false
+    }
   }
 }
 
 // 远程搜索（带微小防抖）
 const remotePatientQuery = (q: string) => {
+  if (!selectedSubjectType.value) {
+    patientOptions.value = []
+    return
+  }
   if ((remotePatientQuery as any)._t) clearTimeout((remotePatientQuery as any)._t)
   ;(remotePatientQuery as any)._t = setTimeout(() => fetchPatients(q), 200)
+}
+
+function clearSubjectSelection() {
+  selectedPatientId.value = ''
+  currentPatient.value = null
+}
+
+function onSubjectTypeChange() {
+  clearSubjectSelection()
+  patientOptions.value = []
+  resetSubjectOptionLoadState()
+  void fetchPatients('')
+}
+
+function onSubjectTypeClear() {
+  clearSubjectSelection()
+  patientOptions.value = []
+  resetSubjectOptionLoadState()
 }
 
 function onTaskManualChange() {
@@ -1122,7 +1207,11 @@ watch(
 
 // 首次展开下拉时拉一页
 function onPatientSelectVisible(visible: boolean) {
-  if (visible && patientOptions.value.length === 0) {
+  if (
+    visible &&
+    selectedSubjectType.value &&
+    loadedSubjectQueryKey.value !== subjectQueryKey(selectedSubjectType.value, '')
+  ) {
     fetchPatients('')
   }
 }
@@ -1239,6 +1328,15 @@ function openScreeningArchiveDialog(record: ScreeningRecordRow) {
   nextTick(() => archiveFormRef.value?.clearValidate())
 }
 
+function resetArchiveEditableFields() {
+  archiveForm.dept = currentDepartmentName.value || ''
+  archiveForm.onsetDate = getBeijingTimestamp(false)
+  archiveForm.pastHistory = ''
+  archiveForm.bedNumber = '不适用（预约筛查，未住院）'
+  archiveForm.course = ''
+  nextTick(() => archiveFormRef.value?.clearValidate())
+}
+
 async function maybePromptScreeningArchive(record: ScreeningRecordRow | null) {
   if (!record || !hasAbnormalScreening() || screeningPromptShown.value) {
     return
@@ -1322,6 +1420,7 @@ async function submitScreeningArchive() {
       option,
       ...patientOptions.value.filter(item => item.value !== option.value),
     ]
+    selectedSubjectType.value = 'PATIENT'
     selectedPatientId.value = option.value
     currentPatient.value = {
       id: patient.id,
@@ -1394,12 +1493,27 @@ let swallowPlaybackRows: {
 }[] = []
 let swallowPlayTimer: number | null = null
 let fileDetectTimer: number | null = null
-let swallowSegments: [number, number][] = [] // 存储吞咽时间段（用于遮罩）
-let aspirationSegments: [number, number][] = [] // 存储误吸时间段（用于红色遮罩）
+let aspirationSegments: [number, number][] = [] // 存储误吸时间段（用于统计和报告）
 type DetectionTask = 'dys' | 'asp'
 type DetectionEventRange = { start: number; end: number }
 let dysphagiaEventRanges: DetectionEventRange[] = []
 let aspirationEventRanges: DetectionEventRange[] = []
+let fileRiskSegments: [number, number][] = []
+
+const DYSPHAGIA_PROBABILITY_COLOR = '#2563EB'
+const ASPIRATION_PROBABILITY_COLOR = '#DC2626'
+const DYSPHAGIA_RISK_AREA_COLOR = 'rgba(37, 99, 235, 0.14)'
+const ASPIRATION_RISK_AREA_COLOR = 'rgba(220, 38, 38, 0.14)'
+
+function rangesToSegments(ranges: DetectionEventRange[]): [number, number][] {
+  return ranges.map(({ start, end }) => [start, end])
+}
+
+function currentFileRiskAreaColor() {
+  return selectedTask.value === 'dys'
+    ? DYSPHAGIA_RISK_AREA_COLOR
+    : ASPIRATION_RISK_AREA_COLOR
+}
 
 // let audioDataBuffer: Float32Array = new Float32Array()
 // const audioUrl = new URL('@/mock/signals/audio.wav', import.meta.url).href
@@ -1421,19 +1535,33 @@ const inferenceStatusLoading = ref(false)
 const isCheckingInferenceBeforeStart = ref(false)
 let inferenceStatusTimer: number | null = null
 
-function isRuntimeSummaryAvailable(summary?: RuntimeSummary | null): boolean {
-  return !!(
-    summary?.serviceLive &&
-    summary.serviceReady &&
-    summary.availableModelCount > 0
-  )
+watch(selectedTask, () => {
+  inferenceStatusChecked.value = false
+  inferenceAvailable.value = false
+  void refreshInferenceStatus()
+})
+
+function runtimeTaskKeyword() {
+  if (selectedTask.value === 'dys') return '筛查'
+  if (selectedTask.value === 'asp') return '误吸'
+  return ''
 }
 
 async function refreshInferenceStatus(showUnavailableMessage = false): Promise<boolean> {
+  const keyword = runtimeTaskKeyword()
+  if (!keyword) {
+    inferenceAvailable.value = true
+    inferenceStatusChecked.value = true
+    return true
+  }
+
   inferenceStatusLoading.value = true
   try {
-    const summary = await getRuntimeSummary()
-    const available = isRuntimeSummaryAvailable(summary)
+    const models = await listRuntimeModels({
+      taskType: keyword,
+      available: true,
+    })
+    const available = models.length > 0
     inferenceAvailable.value = available
     inferenceStatusChecked.value = true
     if (!available && showUnavailableMessage) {
@@ -1927,7 +2055,15 @@ async function handleDeviceDiscovery() {
       ElMessage.warning('登录态校验失败。若刚切换网络，请确认仍使用同一访问地址，或刷新页面后重新登录。')
       return
     }
-    ElMessage.error(error?.message || '设备发现失败')
+    const message = error?.message || '设备发现失败'
+    if (message.includes('未发现设备')) {
+      deviceList.value = []
+      selectedDevice.value = []
+      deviceip.value = ''
+      ElMessage.warning(message)
+      return
+    }
+    ElMessage.error(message)
   } finally {
     loading.value = false
   }
@@ -2542,10 +2678,41 @@ const manualSegmentationEnabled = ref(false)
 const manualSwallowActive = ref(false)
 const manualSwallowStartSec = ref<number | null>(null)
 const manualSwallowSegments = ref<DetectionEventRange[]>([])
+const manualSwallowResultPending = ref(false)
+const pendingManualSwallowSegment = ref<DetectionEventRange | null>(null)
+const forceReleasePending = ref(false)
+const forceReleaseDialogOpen = ref(false)
+let forceReleaseFallbackTimer: number | null = null
 
 const manualSwallowButtonText = computed(() =>
   manualSwallowActive.value ? '结束吞咽' : '开始吞咽'
 )
+
+const canStopDetection = computed(
+  () =>
+    isDetecting.value &&
+    !manualSwallowActive.value &&
+    !manualSwallowResultPending.value
+)
+
+const stopTooltipContent = computed(() => {
+  if (manualSwallowActive.value) {
+    return '请先结束当前人工吞咽段，再等待分类结果返回'
+  }
+  if (manualSwallowResultPending.value) {
+    const segment = pendingManualSwallowSegment.value
+    if (segment) {
+      return `正在等待 ${segment.start.toFixed(2)}s - ${segment.end.toFixed(2)}s 的分类结果`
+    }
+    return '正在等待最新人工吞咽段的分类结果'
+  }
+  if (!isDetecting.value) {
+    return '仅在检测过程中启用'
+  }
+  return ''
+})
+
+const stopTooltipDisabled = computed(() => canStopDetection.value)
 
 const canUseManualSwallowButton = computed(
   () =>
@@ -2565,12 +2732,110 @@ const manualSwallowTooltip = computed(() => {
 })
 
 function resetManualSwallowState(resetMode = false) {
+  cancelForceReleaseFallbackTimer()
+  forceReleasePending.value = false
   manualSwallowActive.value = false
   manualSwallowStartSec.value = null
   manualSwallowSegments.value = []
+  manualSwallowResultPending.value = false
+  pendingManualSwallowSegment.value = null
   if (resetMode) {
     manualSegmentationEnabled.value = false
   }
+}
+
+function handleStopButtonClick() {
+  if (manualSwallowActive.value) {
+    ElMessage.warning(stopTooltipContent.value)
+    return
+  }
+  if (manualSwallowResultPending.value) {
+    ElMessage.warning(stopTooltipContent.value)
+    return
+  }
+  if (!isDetecting.value) {
+    ElMessage.warning(stopTooltipContent.value)
+  }
+}
+
+function markManualSwallowResultPending(segment: DetectionEventRange) {
+  manualSwallowResultPending.value = true
+  pendingManualSwallowSegment.value = { ...segment }
+}
+
+function clearManualSwallowResultPending(options: { deferForcedRelease?: boolean } = {}) {
+  manualSwallowResultPending.value = false
+  pendingManualSwallowSegment.value = null
+  if (forceReleasePending.value && !options.deferForcedRelease) {
+    finalizeForcedReleaseStop('当前人工吞咽段分类已返回，系统将释放设备')
+  }
+}
+
+function cancelForceReleaseFallbackTimer() {
+  if (forceReleaseFallbackTimer != null) {
+    window.clearTimeout(forceReleaseFallbackTimer)
+    forceReleaseFallbackTimer = null
+  }
+}
+
+function finalizeForcedReleaseStop(message?: string) {
+  cancelForceReleaseFallbackTimer()
+  forceReleasePending.value = false
+  if (message) {
+    ElMessage.warning(message)
+  }
+  void stopDetection({ force: true })
+}
+
+function showForceReleaseRequestDialog(reason?: string) {
+  if (forceReleaseDialogOpen.value) return
+  forceReleaseDialogOpen.value = true
+  void ElMessageBox.alert(
+    reason || '其他账户请求释放当前设备，会自动停止本次检测。',
+    '设备释放请求',
+    {
+      type: 'warning',
+      confirmButtonText: '我知道了',
+      closeOnClickModal: false,
+      closeOnPressEscape: true,
+      customClass: 'force-release-dialog',
+    },
+  )
+    .catch(() => undefined)
+    .finally(() => {
+      forceReleaseDialogOpen.value = false
+    })
+}
+
+function requestForcedReleaseStop(reason?: string, timeoutSeconds = 15) {
+  showForceReleaseRequestDialog(reason)
+
+  if (!isDetecting.value) {
+    return
+  }
+
+  if (manualSwallowActive.value) {
+    manualSwallowActive.value = false
+    manualSwallowStartSec.value = null
+    ElMessage.warning('已取消未完成的人工吞咽标注，并停止检测')
+    void stopDetection({ force: true })
+    return
+  }
+
+  if (manualSwallowResultPending.value) {
+    forceReleasePending.value = true
+    const waitMs = Math.max(timeoutSeconds, 5) * 1000
+    cancelForceReleaseFallbackTimer()
+    forceReleaseFallbackTimer = window.setTimeout(() => {
+      if (forceReleasePending.value) {
+        finalizeForcedReleaseStop('等待人工吞咽段分类超时，系统将释放设备')
+      }
+    }, waitMs)
+    ElMessage.warning('正在等待当前人工吞咽段分类结果，完成后将自动释放设备')
+    return
+  }
+
+  void stopDetection({ force: true })
 }
 
 function getCurrentRealtimeSecond() {
@@ -2646,6 +2911,7 @@ async function handleManualSwallowClick() {
   manualSwallowSegments.value.push(segment)
   manualSwallowActive.value = false
   manualSwallowStartSec.value = null
+  markManualSwallowResultPending(segment)
 
   try {
     await submitManualSwallowSegment({
@@ -2660,6 +2926,7 @@ async function handleManualSwallowClick() {
       duration: 2500,
     })
   } catch (e: any) {
+    clearManualSwallowResultPending()
     showMonitorNotice({
       title: '人工吞咽段提交失败',
       message: e?.message || '模型推理不会收到本次人工分割段，请重试。',
@@ -2669,6 +2936,7 @@ async function handleManualSwallowClick() {
 }
 
 function resetUiInputs() {
+  selectedSubjectType.value = ''
   selectedPatientId.value = ''
   selectedTask.value = ''
   taskManuallySelected.value = false
@@ -2718,10 +2986,10 @@ function clearFileDetectionOutcome() {
   dysphagiaDisplaySeries = []
   aspirationDisplaySeries = []
   swallowPlaybackRows = []
-  swallowSegments = []
   aspirationSegments = []
   dysphagiaEventRanges = []
   aspirationEventRanges = []
+  fileRiskSegments = []
   fileDetectSessionId.value = ''
   checkRecordsSaved.value = false
   hasStopped.value = false
@@ -2829,6 +3097,11 @@ function setDefaultMapping(signalType: 'imu' | 'gas') {
   }
 }
 
+function resetCsvConfigFormToDefaults() {
+  setDefaultMapping(currentSignalType.value)
+  nextTick(() => csvConfigFormRef.value?.clearValidate())
+}
+
 function resetChartAndData() {
   if (animationId != null) {
     cancelAnimationFrame(animationId)
@@ -2863,10 +3136,10 @@ function resetChartAndData() {
   dysphagiaDisplaySeries = []
   aspirationDisplaySeries = []
   swallowPlaybackRows = []
-  swallowSegments = []
   aspirationSegments = []
   dysphagiaEventRanges = []
   aspirationEventRanges = []
+  fileRiskSegments = []
   resetManualSwallowState()
 
   // imuIdx = 0
@@ -3053,7 +3326,8 @@ async function startDetection() {
       primaryId, // 设备ID
       device.name || primaryId,
       selectedRuntimeSubjectId.value, // 患者编号或预约编号
-      selectedPatientName.value // 患者姓名或预约者姓名
+      selectedPatientName.value, // 患者姓名或预约者姓名
+      selectedTask.value
     )
 
     if (connectResult.occupied) {
@@ -3103,7 +3377,18 @@ async function startDetection() {
   }
 }
 
-async function stopDetection() {
+async function stopDetection(options: { force?: boolean } = {}) {
+  if (!options.force && manualSwallowActive.value) {
+    ElMessage.warning(stopTooltipContent.value)
+    return
+  }
+  if (!options.force && manualSwallowResultPending.value) {
+    ElMessage.warning(stopTooltipContent.value)
+    return
+  }
+  cancelForceReleaseFallbackTimer()
+  forceReleasePending.value = false
+
   // === 计算主设备（取已选列表的第一个）+ IP（从 deviceList 里找）
   // const primaryId = selectedDevice.value?.[0] || ''
   // const primaryIp = deviceList.value.find((d) => d.id === primaryId)?.ip || ''
@@ -3125,12 +3410,10 @@ async function stopDetection() {
     return
   }
 
+  const shouldPreserveManualOverlay =
+    manualSegmentationEnabled.value && manualSwallowSegments.value.length > 0
+
   // 实时模式 - 断开WebSocket和设备连接
-  if (manualSwallowActive.value) {
-    manualSwallowActive.value = false
-    manualSwallowStartSec.value = null
-    ElMessage.warning('未结束的人工吞咽段已取消')
-  }
   isDetecting.value = false
   hasStopped.value = true
   canReset.value = true
@@ -3139,6 +3422,9 @@ async function stopDetection() {
   if (animationId != null) {
     cancelAnimationFrame(animationId)
     animationId = null
+  }
+  if (shouldPreserveManualOverlay) {
+    preserveManualSwallowOverlayAfterStop()
   }
 
   // 断开WebSocket
@@ -3165,6 +3451,9 @@ async function stopDetection() {
   }
 
   await finalizeAppointmentScreeningAfterDetection()
+  if (shouldPreserveManualOverlay) {
+    preserveManualSwallowOverlayAfterStop()
+  }
 }
 
 function resetDetection() {
@@ -3410,7 +3699,7 @@ function createSwallowOption(
         name: '吞咽障碍概率',
         type: 'line',
         showSymbol: false,
-        lineStyle: { width: 2, color: '#E67E22' },
+        lineStyle: { width: 2, color: DYSPHAGIA_PROBABILITY_COLOR },
         data: dysphagia,
         animation: false,
         sampling: 'lttb',
@@ -3421,7 +3710,7 @@ function createSwallowOption(
         name: '误吸概率',
         type: 'line',
         showSymbol: false,
-        lineStyle: { width: 2, color: '#FF4D4F' },
+        lineStyle: { width: 2, color: ASPIRATION_PROBABILITY_COLOR },
         data: aspiration,
         animation: false,
         sampling: 'lttb',
@@ -3459,7 +3748,7 @@ function createSwallowOptionFile(
         name: '吞咽风险概率',
         type: 'line',
         showSymbol: false,
-        lineStyle: { width: 2, color: '#E67E22' },
+        lineStyle: { width: 2, color: ASPIRATION_PROBABILITY_COLOR },
         data: risk,
         animation: false,
         sampling: 'lttb',
@@ -3474,11 +3763,11 @@ function createSwallowOptionFile(
 function createSwallowRiskOptionFile(
   dysphagia: [number, number][],
   aspiration: [number, number][],
-  swallowSegments: [number, number][]
+  riskSegments: [number, number][]
 ): echarts.EChartsOption {
-  // 生成吞咽段遮罩数据
-  const markAreas: any = swallowSegments.map(([start, end]) => [
-    { xAxis: start, itemStyle: { color: 'rgba(128, 128, 128, 0.15)' } },
+  // 文件模式只高亮当前检测任务判定为异常的吞咽段。
+  const markAreas: any = riskSegments.map(([start, end]) => [
+    { xAxis: start, itemStyle: { color: currentFileRiskAreaColor() } },
     { xAxis: end },
   ])
 
@@ -3511,23 +3800,26 @@ function createSwallowRiskOptionFile(
         name: '吞咽障碍概率',
         type: 'line',
         showSymbol: false,
-        lineStyle: { width: 2, color: '#E67E22' },
+        lineStyle: { width: 2, color: DYSPHAGIA_PROBABILITY_COLOR },
         data: dysphagia,
         animation: false,
         sampling: 'lttb',
         progressive: 2000,
         progressiveThreshold: 3000,
-        markArea: {
-          silent: true,
-          data: markAreas,
-          label: { show: false },
-        },
+        markArea:
+          markAreas.length > 0
+            ? {
+                silent: true,
+                data: markAreas,
+                label: { show: false },
+              }
+            : undefined,
       },
       {
         name: '误吸概率',
         type: 'line',
         showSymbol: false,
-        lineStyle: { width: 2, color: '#FF4D4F' },
+        lineStyle: { width: 2, color: ASPIRATION_PROBABILITY_COLOR },
         data: aspiration,
         animation: false,
         sampling: 'lttb',
@@ -3759,6 +4051,68 @@ function applyManualSwallowOverlayToCharts(
   apply(gasChart, 1, shortOverlay)
   apply(audioChart, 1, shortOverlay)
   apply(swallowChart, 2, longOverlay)
+}
+
+function currentRealtimeChartWindows() {
+  const currentSec = +Math.max(
+    realtimeRenderCursorSec,
+    latestRealtimeSeriesTime(),
+    getSeriesTailTime(dysphagiaRealtimeSeries),
+    getSeriesTailTime(aspirationRealtimeSeries),
+    0
+  ).toFixed(3)
+  const startShort = +Math.max(0, currentSec - durationShort).toFixed(3)
+  const endShort = +(startShort + durationShort).toFixed(3)
+  const startLong = +Math.max(0, currentSec - durationLong).toFixed(3)
+  const endLong = +(startLong + durationLong).toFixed(3)
+  return { startShort, endShort, startLong, endLong }
+}
+
+function refreshManualSwallowOverlayOnCurrentWindow() {
+  if (isFileMode.value) return
+  if (
+    manualSwallowSegments.value.length === 0 &&
+    !manualSwallowActive.value
+  ) {
+    return
+  }
+  const { startShort, endShort, startLong, endLong } = currentRealtimeChartWindows()
+  applyManualSwallowOverlayToCharts(startShort, endShort, startLong, endLong)
+}
+
+function preserveManualSwallowOverlayAfterStop() {
+  refreshManualSwallowOverlayOnCurrentWindow()
+  requestAnimationFrame(() => refreshManualSwallowOverlayOnCurrentWindow())
+  window.setTimeout(() => refreshManualSwallowOverlayOnCurrentWindow(), 120)
+}
+
+function refreshRealtimeProbabilityChartPreservingManualOverlay() {
+  if (isFileMode.value || !swallowChart) return
+  const { startShort, endShort, startLong, endLong } = currentRealtimeChartWindows()
+  swallowChart.setOption(
+    {
+      ...createSwallowOption(
+        dysphagiaRealtimeSeries,
+        aspirationRealtimeSeries,
+        startLong,
+        endLong
+      ),
+      ...AXIS_UPDATE_ANIM,
+    },
+    AXIS_UPDATE_SETOPTION
+  )
+  applyManualSwallowOverlayToCharts(startShort, endShort, startLong, endLong)
+}
+
+function finalizeForcedReleaseAfterPredictionRendered() {
+  if (!forceReleasePending.value) return
+  refreshRealtimeProbabilityChartPreservingManualOverlay()
+  requestAnimationFrame(() => {
+    refreshRealtimeProbabilityChartPreservingManualOverlay()
+    window.setTimeout(() => {
+      finalizeForcedReleaseStop('当前人工吞咽段分类已返回，系统将释放设备')
+    }, 80)
+  })
 }
 
 // function showRiskAlert(risk: number) {
@@ -4060,7 +4414,8 @@ async function startFileModeDetection() {
       uploadedFiles.imu,
       uploadedFiles.gas,
       patientId,
-      patientName
+      patientName,
+      selectedTask.value
     )
 
     fileDetectSessionId.value = result.sessionId || ''
@@ -4099,8 +4454,43 @@ async function startFileModeDetection() {
         end / 1000,
       ])
 
-      // 保存吞咽时间段（用于遮罩）
-      swallowSegments = events as [number, number][]
+      const totalEvents = result.swallow_events.length
+      let dysphagiaCount = 0
+
+      // 统计当前任务的异常吞咽段，用于概率图和三类原始信号图的背景高亮。
+      const aspirationEvents: { time: string; label: string }[] = []
+      aspirationSegments = []
+      aspirationEventRanges = []
+      dysphagiaEventRanges = []
+
+      if (result.aspiration) {
+        result.aspiration.forEach((asp, idx) => {
+          if (asp.predicted_class === 1 && events[idx]) {
+            const [start, end] = events[idx]
+            aspirationEvents.push({
+              time: `${start.toFixed(1)}s - ${end.toFixed(1)}s`,
+              label: asp.label,
+            })
+            aspirationSegments.push([start, end])
+            aspirationEventRanges.push({ start, end })
+          }
+        })
+      }
+
+      if (result.dysphagia) {
+        result.dysphagia.forEach((dys, idx) => {
+          if (dys.predicted_class === 1 && events[idx]) {
+            const [start, end] = events[idx]
+            dysphagiaCount++
+            dysphagiaEventRanges.push({ start, end })
+          }
+        })
+      }
+
+      fileRiskSegments =
+        selectedTask.value === 'dys'
+          ? rangesToSegments(dysphagiaEventRanges)
+          : rangesToSegments(aspirationEventRanges)
 
       // 生成两个模型的概率数据
       swallowPlaybackRows = []
@@ -4142,14 +4532,15 @@ async function startFileModeDetection() {
         })
       }
 
-      // 初始化文件模式的吞咽图（Auto 轴 + inside + 吞咽段遮罩）
-      const base = createSwallowRiskOptionFile([], [], swallowSegments)
+      // 初始化文件模式概率图（Auto 轴 + inside + 当前任务异常段遮罩）
+      const base = createSwallowRiskOptionFile([], [], fileRiskSegments)
       swallowChart.setOption(
         { ...base, dataZoom: [{ ...INSIDE_ZOOM }] },
         { notMerge: true }
       )
       dysphagiaDisplaySeries = []
       aspirationDisplaySeries = []
+      renderFileRiskMasks()
 
       // 以 50ms 一批追加点，模拟曲线缓慢出现
       let idx = 0
@@ -4164,7 +4555,7 @@ async function startFileModeDetection() {
         const opt = createSwallowRiskOptionFile(
           dysphagiaDisplaySeries,
           aspirationDisplaySeries,
-          swallowSegments
+          fileRiskSegments
         )
         swallowChart.setOption(opt, { notMerge: true })
 
@@ -4173,46 +4564,11 @@ async function startFileModeDetection() {
             clearInterval(swallowPlayTimer)
             swallowPlayTimer = null
           }
-          // 渲染完成后，在IMU/GAS/Audio图表上添加误吸遮罩
-          renderAspirationMasks()
+          renderFileRiskMasks()
         }
       }, 50)
 
       // 显示检测结果和危险提示
-      const totalEvents = result.swallow_events.length
-      let dysphagiaCount = 0
-
-      // 统计误吸段并收集时间段
-      const aspirationEvents: { time: string; label: string }[] = []
-      aspirationSegments = [] // 重置误吸段
-      aspirationEventRanges = []
-      dysphagiaEventRanges = []
-
-      if (result.aspiration) {
-        result.aspiration.forEach((asp, idx) => {
-          if (asp.predicted_class === 1 && events[idx]) {
-            const [start, end] = events[idx]
-            aspirationEvents.push({
-              time: `${start.toFixed(1)}s - ${end.toFixed(1)}s`,
-              label: asp.label,
-            })
-            // 收集误吸时间段用于遮罩
-            aspirationSegments.push([start, end])
-            aspirationEventRanges.push({ start, end })
-          }
-        })
-      }
-
-      if (result.dysphagia) {
-        result.dysphagia.forEach((dys, idx) => {
-          if (dys.predicted_class === 1 && events[idx]) {
-            const [start, end] = events[idx]
-            dysphagiaCount++
-            dysphagiaEventRanges.push({ start, end })
-          }
-        })
-      }
-
       realtimeStats.totalSwallows = totalEvents
       realtimeStats.aspirationSwallows = aspirationEvents.length
       realtimeStats.dysphagiaSwallows = dysphagiaCount
@@ -4321,6 +4677,19 @@ function initCharts() {
 }
 
 // ==================== WebSocket 实时数据接收 ====================
+type DeviceControlCommand = {
+  type?: string
+  reason?: string
+  timeoutSeconds?: number
+}
+
+function handleDeviceControlCommand(command: DeviceControlCommand) {
+  if (command?.type !== 'FORCE_RELEASE_REQUEST') {
+    return
+  }
+  requestForcedReleaseStop(command.reason, command.timeoutSeconds)
+}
+
 // 连接WebSocket
 function connectWebSocket(deviceId: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -4384,6 +4753,18 @@ function connectWebSocket(deviceId: string): Promise<void> {
                 handleRealtimePredictionResult(result)
               } catch (error) {
                 console.error('解析预测结果失败:', error)
+              }
+            }
+          )
+
+          stompClient?.subscribe(
+            `/topic/device/${deviceId}/control`,
+            (message: any) => {
+              try {
+                const command = JSON.parse(message.body)
+                handleDeviceControlCommand(command)
+              } catch (error) {
+                console.error('解析设备控制指令失败:', error)
               }
             }
           )
@@ -4499,22 +4880,36 @@ function handleRealtimeAudioData(data: {
 function handleRealtimePredictionResult(result: any) {
   console.log('收到实时预测结果:', result)
 
+  // 兼容两种字段名：swallowEvents（驼峰）和 swallow_events（下划线）
+  const swallowEvents = result.swallowEvents || result.swallow_events
+
   // 检查是否有错误消息
   if (result.message) {
+    if (manualSwallowResultPending.value && swallowEvents?.length > 0) {
+      clearManualSwallowResultPending({ deferForcedRelease: true })
+    }
     showDetectionNotice({
       title: '预测结果',
       message: result.message,
       type: 'info',
       duration: 3000,
     })
+    if (forceReleasePending.value && !swallowEvents?.length) {
+      finalizeForcedReleaseStop('人工吞咽段分类未返回有效结果，系统将释放设备')
+    }
     return
   }
 
-  // 兼容两种字段名：swallowEvents（驼峰）和 swallow_events（下划线）
-  const swallowEvents = result.swallowEvents || result.swallow_events
-
   // 检查是否检测到吞咽事件
   if (swallowEvents && swallowEvents.length > 0) {
+    const shouldFinalizeForcedReleaseAfterRender =
+      manualSwallowResultPending.value && forceReleasePending.value
+    if (manualSwallowResultPending.value) {
+      clearManualSwallowResultPending({
+        deferForcedRelease: shouldFinalizeForcedReleaseAfterRender,
+      })
+    }
+
     const totalEvents = swallowEvents.length
 
     // 获取当前相对时间（秒）- 这是从检测开始到现在的总时间
@@ -4686,6 +5081,9 @@ function handleRealtimePredictionResult(result: any) {
         type: 'success',
         duration: 3000,
       })
+    }
+    if (shouldFinalizeForcedReleaseAfterRender || forceReleasePending.value) {
+      finalizeForcedReleaseAfterPredictionRendered()
     }
   }
 }
@@ -5071,25 +5469,24 @@ const renderFileModeCharts = () => {
   }
 }
 
-// 在IMU/GAS/Audio图表上渲染误吸遮罩
-function renderAspirationMasks() {
-  if (aspirationSegments.length === 0) {
-    console.log('没有误吸段，跳过遮罩渲染')
+// 在 IMU/GAS/Audio 图表上渲染文件模式当前检测任务的异常段遮罩。
+function renderFileRiskMasks() {
+  if (fileRiskSegments.length === 0) {
+    console.log('没有异常吞咽段，跳过遮罩渲染')
     return
   }
 
   // 检查图表是否已初始化
   if (!imuChart || !gasChart || !audioChart) {
-    console.warn('图表未初始化，无法渲染误吸遮罩')
+    console.warn('图表未初始化，无法渲染异常段遮罩')
     return
   }
 
-  console.log('开始渲染误吸遮罩，误吸段:', aspirationSegments)
+  console.log('开始渲染文件模式异常段遮罩:', fileRiskSegments)
 
   try {
-    // 生成误吸段遮罩数据（红色半透明）
-    const markAreas: any = aspirationSegments.map(([start, end]) => [
-      { xAxis: start, itemStyle: { color: 'rgba(255, 77, 79, 0.15)' } },
+    const markAreas: any = fileRiskSegments.map(([start, end]) => [
+      { xAxis: start, itemStyle: { color: currentFileRiskAreaColor() } },
       { xAxis: end },
     ])
 
@@ -5142,10 +5539,10 @@ function renderAspirationMasks() {
     )
 
     console.log(
-      `✅ 已在IMU/GAS/Audio图表上添加${aspirationSegments.length}个误吸遮罩`
+      `✅ 已在IMU/GAS/Audio图表上添加${fileRiskSegments.length}个异常段遮罩`
     )
   } catch (error) {
-    console.error('❌ 渲染误吸遮罩失败:', error)
+    console.error('❌ 渲染异常段遮罩失败:', error)
   }
 }
 
@@ -5299,7 +5696,8 @@ onBeforeRouteLeave((to, from, next) => {
 
 <style scoped>
 .monitor-container {
-  width: 1304px;
+  width: min(1304px, calc(100vw - 260px));
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -5419,7 +5817,8 @@ onBeforeRouteLeave((to, from, next) => {
   gap: 8px;
 }
 
-.start-button-wrapper {
+.start-button-wrapper,
+.stop-button-wrapper {
   display: inline-flex;
 }
 
@@ -5434,12 +5833,19 @@ onBeforeRouteLeave((to, from, next) => {
   min-width: 0;
 }
 
-.subject-select {
+.subject-select,
+.device-select {
   flex: 1 1 0;
+  min-width: 0;
 }
 
-.task-select {
+.task-select,
+.subject-type-select {
   flex: 0 0 160px;
+}
+
+.subject-empty {
+  padding: 10px 0 14px;
 }
 
 .setting-button {
@@ -5737,5 +6143,27 @@ onBeforeRouteLeave((to, from, next) => {
 
 .monitor-notice-info {
   border-left: 5px solid #3b82f6;
+}
+
+.force-release-dialog {
+  width: 440px;
+  max-width: calc(100vw - 40px);
+  border-radius: 8px;
+  padding: 18px 20px 16px;
+}
+
+.force-release-dialog .el-message-box__header {
+  padding-bottom: 10px;
+}
+
+.force-release-dialog .el-message-box__title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.force-release-dialog .el-message-box__content {
+  color: #374151;
+  font-size: 15px;
+  line-height: 1.7;
 }
 </style>
