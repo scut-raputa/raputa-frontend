@@ -1,6 +1,5 @@
 <template>
   <div class="report-container" ref="reportContent">
-    <!-- Header -->
     <div class="header-center">
       <img src="@/assets/hospital-logo.svg" class="report-logo" />
       <div class="header-texts">
@@ -12,7 +11,6 @@
     <div class="report-id">{{ reportNumberLabel }}：{{ report.reportId }}</div>
     <hr class="divider" />
 
-    <!-- Main Content -->
     <div class="report-body">
       <div class="report-section base-section">
         <div class="base-info-grid">
@@ -81,7 +79,6 @@
       </div>
     </div>
 
-    <!-- 建议措施独立拉伸到底 -->
     <div class="report-section suggestion-section">
       <h4>建议措施</h4>
       <textarea
@@ -92,7 +89,6 @@
       <pre v-else class="suggestion-plain">{{ suggestionText }}</pre>
     </div>
 
-    <!-- Footer -->
     <div class="spacer" />
       <div class="report-footer">
         <div class="doctor-field">
@@ -155,7 +151,6 @@ const { report, editingMode = true } = defineProps<{
 const reportContent = ref<HTMLDivElement | null>(null)
 const suggestionText = ref(report.suggestions.join('\n'))
 
-// 新增：医生姓名的可编辑文本
 const doctorText = ref(report.doctor || '')
 
 const isAspirationReport = computed(() => report.taskType === 'asp')
@@ -208,7 +203,6 @@ function formatSeconds(value: number) {
   return `${Number(value || 0).toFixed(2)} s`
 }
 
-// 如果父组件更新了 report.doctor，同步过来
 watch(
   () => report.doctor,
   (val) => {
@@ -221,7 +215,7 @@ watch(
 defineExpose({
   reportContent,
   suggestionText,
-  doctorText, // 暴露给外面（Monitor.vue）读取
+  doctorText,
 })
 </script>
 

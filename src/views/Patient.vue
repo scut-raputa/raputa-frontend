@@ -1,7 +1,7 @@
 <template>
   <div class="patient-container">
     <div class="grid-wrapper">
-      <!-- 患者预约情况 -->
+
       <el-card shadow="hover" class="card">
         <template #header>
           <div class="card-header">患者预约情况</div>
@@ -46,7 +46,6 @@
           </el-button>
         </div>
 
-        <!-- 患者表格 -->
         <el-table
           v-loading="apptLoading"
           :data="apptRows"
@@ -59,7 +58,7 @@
           :row-style="row35Style"
           :cell-style="cell35Style"
         >
-          <el-table-column prop="id" label="就诊编号" min-width="172" show-overflow-tooltip />
+          <el-table-column prop="id" label="就诊编号" min-width="150" show-overflow-tooltip />
           <el-table-column label="姓名" min-width="98">
             <template #default="{ row }">
               <template v-if="!row.__filler">
@@ -102,7 +101,6 @@
           </el-table-column>
         </el-table>
 
-        <!-- 分页器 -->
         <div class="pagination-wrapper">
           <el-pagination
             :current-page="apptPage"
@@ -115,7 +113,6 @@
           />
         </div>
 
-        <!-- 添加预约对话框 -->
         <el-dialog
           v-model="createApptVisible"
           title="新增预约"
@@ -203,7 +200,6 @@
           </template>
         </el-dialog>
 
-        <!-- 编辑预约对话框 -->
         <el-dialog
           v-model="editApptVisible"
           title="编辑预约信息"
@@ -294,7 +290,6 @@
         </el-dialog>
       </el-card>
 
-      <!-- 患者检测记录 -->
       <el-card shadow="hover" class="card">
         <template #header>
           <div class="card-header">患者检测记录</div>
@@ -355,7 +350,6 @@
           </el-select>
         </div>
 
-        <!-- 检测记录表格 -->
         <el-table
           v-loading="checkLoading"
           :data="checkRows"
@@ -403,7 +397,6 @@
         </div>
       </el-card>
 
-      <!-- 患者管理（通栏） -->
       <el-card shadow="hover" class="card wide">
         <template #header>
           <div class="card-header">患者管理</div>
@@ -819,7 +812,6 @@ import type { PatientRow } from '@/types/patient'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createPatient, updatePatient, deletePatient } from '@/api/patient'
 
-/** —— 公用 —— */
 function formatLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -998,7 +990,6 @@ function apptRowClassName({ row }: { row: any }) {
   return row.__filler ? 'is-filler' : ''
 }
 
-// 添加预约相关
 const createApptVisible = ref(false)
 const createApptSubmitting = ref(false)
 const createApptRef = ref<FormInstance>()
@@ -1160,16 +1151,14 @@ async function onCreateApptSubmit() {
     createApptDraft.value = null
     createApptCloseFromSuccess.value = true
     createApptVisible.value = false
-    
-    // 将日期选择器设置为新添加的预约日期，确保能看到新添加的预约
+
     if (appointmentDate) {
       apptSelectedDate.value = new Date(appointmentDate)
     }
-    
-    // 清除搜索条件，确保能看到新添加的预约
+
     apptSearchName.value = ''
     apptSearchDept.value = ''
-    
+
     apptPage.value = 1
     fetchAppointments()
   } finally {
@@ -1177,7 +1166,6 @@ async function onCreateApptSubmit() {
   }
 }
 
-// 编辑预约相关
 const editApptVisible = ref(false)
 const editApptSubmitting = ref(false)
 const editApptRef = ref<FormInstance>()
@@ -1421,7 +1409,6 @@ const checkedLabel = (val: unknown): '是' | '否' =>
   val === true || val === '是' || val === 1 ? '是' : '否'
 const checkedTagType = (label: '是' | '否'): TagType =>
   label === '是' ? 'success' : 'info'
-
 
 async function fetchPatients() {
   patientLoading.value = true

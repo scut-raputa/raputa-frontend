@@ -1,7 +1,7 @@
 <template>
   <div class="home-container">
     <div class="grid-wrapper">
-      <!-- 折线图 -->
+
       <el-card shadow="hover" class="card chart-card">
         <template #header>
           <div class="card-header">每日检测患者数（去重）</div>
@@ -14,7 +14,6 @@
         />
       </el-card>
 
-      <!-- 柱形图 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
           <div class="card-header">每日检测结果分布</div>
@@ -27,7 +26,6 @@
         />
       </el-card>
 
-      <!-- 饼图 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
           <div class="card-header">各科室检测患者占比</div>
@@ -40,7 +38,6 @@
         />
       </el-card>
 
-      <!-- 设备状态 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
           <div class="card-header">每日设备使用时长（会话）</div>
@@ -104,13 +101,13 @@ function generateDateLabels(days: number): string[] {
   const labels: string[] = []
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  
+
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(today)
     date.setDate(today.getDate() - i)
     labels.push(formatDateMMDD(date))
   }
-  
+
   return labels
 }
 

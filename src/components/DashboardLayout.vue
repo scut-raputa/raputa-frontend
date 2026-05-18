@@ -1,7 +1,7 @@
 <template>
   <div class="common-layout">
     <el-container>
-      <!-- 顶栏 -->
+
       <el-header class="header">
         <div class="header-left">
           <span class="system-name">吞咽障碍智能检测系统</span>
@@ -62,7 +62,7 @@
       </el-header>
 
       <el-container>
-        <!-- 侧栏 -->
+
         <el-aside :class="['sidebar', isCollapsed ? 'collapsed' : '']">
           <el-menu
             v-model="activeMenu"
@@ -111,7 +111,6 @@
           </el-menu>
         </el-aside>
 
-        <!-- 主体内容 -->
         <el-main :class="{ collapsed: isCollapsed }">
           <div class="main-inner">
             <router-view />
@@ -145,7 +144,9 @@ const router = useRouter()
 const route = useRoute()
 
 const currentUser = ref<UserVO | null>(getUser())
-const avatarUrl = ref<string>(resolveResourceUrl(currentUser.value?.avatarUrl))
+const avatarUrl = computed(() =>
+  resolveResourceUrl(currentUser.value?.avatarUrl, currentUser.value?.role),
+)
 const lastLoginAtDisplay = computed(() =>
   formatDateTime(currentUser.value?.lastLoginAt),
 )
@@ -171,9 +172,7 @@ async function logout() {
   setTimeout(async () => {
     try {
       await logoutUser()
-    } catch {
-      // 即使网络异常，也清理前端内存态并回到登录页。
-    }
+    } catch {}
     clearUser()
     router.push('/login')
   }, 1500)
@@ -192,11 +191,20 @@ function onMenuSelect(index: string) {
   }
 }
 
-function resolveResourceUrl(path?: string) {
+function defaultAvatarPath(role?: string) {
+  return role === 'ADMIN'
+    ? '/images/avatar-admin.png'
+    : '/images/avatar-department.png'
+}
+
+function resolveResourceUrl(path?: string, role?: string) {
   const BASE = 'http://localhost:8080'
-  if (!path || path.trim() === '') return `${BASE}/images/default-avatar.png`
-  if (path.startsWith('http://') || path.startsWith('https://')) return path
-  return `${BASE}${path.startsWith('/') ? '' : '/'}${path}`
+  const raw = path?.trim()
+  const normalized = raw || defaultAvatarPath(role)
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return normalized
+  }
+  return `${BASE}${normalized.startsWith('/') ? '' : '/'}${normalized}`
 }
 
 function formatDateTime(iso?: string | null) {
@@ -230,7 +238,6 @@ body {
   overflow-y: visible;
 }
 
-/* 顶栏固定 */
 .el-header {
   position: fixed;
   top: 0;
@@ -273,7 +280,6 @@ body {
   border-radius: 0.375rem !important;
 }
 
-/* 主体布局容器 */
 .el-container:not(.is-vertical) {
   display: flex;
   flex-direction: row;
@@ -284,7 +290,6 @@ body {
   position: relative;
 }
 
-/* 侧栏固定 */
 .el-aside {
   position: fixed;
   top: 80px;
@@ -305,7 +310,6 @@ body {
   display: none;
 }
 
-/* 菜单样式 */
 :deep(.el-menu) {
   border-right: none;
   background-color: transparent;
@@ -360,7 +364,6 @@ body {
   justify-content: center;
 }
 
-/* 主内容区 */
 .el-main {
   margin-left: 200px;
   display: flex;
@@ -381,7 +384,6 @@ body {
   max-width: calc(100vw - 64px);
 }
 
-/* 内部内容容器 */
 .main-inner {
   width: 100%;
   min-width: 0;
@@ -391,13 +393,11 @@ body {
   margin-bottom: auto;
 }
 
-/* 卡片组件 */
 :deep(.el-card) {
   min-width: 360px;
   flex-shrink: 0;
 }
 
-/* 用户信息卡片 */
 .user-dropdown-card {
   width: 20rem;
   padding: 0;

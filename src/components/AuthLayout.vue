@@ -1,4 +1,3 @@
-<!-- src/components/AuthLayout.vue -->
 <template>
   <div class="auth-layout">
     <div class="background" />

@@ -1,10 +1,8 @@
 import { postJson } from '@/utils/request'
 
-
-// 检测结果接口定义
 export interface SwallowEvent {
-  start: number  // 开始时间（毫秒）
-  end: number    // 结束时间（毫秒）
+  start: number
+  end: number
 }
 
 export interface DysphagiaResult {
@@ -26,19 +24,12 @@ export interface DetectionResponse {
   predictionWindowSeconds?: number
   prediction_window_seconds?: number
   swallowEvents?: number[][]
-  swallow_events?: number[][]  // 吞咽事件时间段 [[start, end], ...]
-  dysphagia?: DysphagiaResult[]  // 吞咽障碍检测结果
-  aspiration?: AspirationResult[]  // 误吸检测结果
-  message?: string  // 错误消息（当未检测到吞咽事件时）
+  swallow_events?: number[][]
+  dysphagia?: DysphagiaResult[]
+  aspiration?: AspirationResult[]
+  message?: string
 }
 
-/**
- * 上传文件并进行检测
- * @param audioFile 音频文件（WAV格式）
- * @param imuFile IMU信号文件（CSV格式）
- * @param gasFile 鼻气流信号文件（CSV格式）
- * @returns 检测结果
- */
 export async function uploadAndPredict(
   audioFile: File,
   imuFile: File,
@@ -63,7 +54,7 @@ export async function uploadAndPredict(
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 60000, // 60秒超时
+        timeout: 60000,
       }
     )
 

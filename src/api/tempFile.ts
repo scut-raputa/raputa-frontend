@@ -1,4 +1,3 @@
-// src/api/tempFile.ts
 import request from '@/utils/request'
 import type { TempFileUploadVO, CsvMappingRequest } from '@/types/tempFile'
 

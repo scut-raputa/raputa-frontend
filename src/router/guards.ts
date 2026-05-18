@@ -1,4 +1,3 @@
-// src/router/guards.ts
 import type { Router } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { clearUser, getUser, setUser } from '@/utils/auth'
@@ -66,9 +65,7 @@ export function installRouterGuards(router: Router) {
 
     const isDeviceRoute =
       to.path === '/device' ||
-      to.path.startsWith('/dashboard/device') ||
-      to.path === '/department' ||
-      to.path.startsWith('/dashboard/department')
+      to.path.startsWith('/dashboard/device')
     if (isDeviceRoute && user.role !== 'DEPARTMENT' && user.role !== 'ADMIN') {
       ElMessage.error('无权限访问设备管理')
       const back =

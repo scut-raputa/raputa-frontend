@@ -1,4 +1,3 @@
-// src/api/realtime.ts
 import { postJson } from '@/utils/request'
 
 export interface DeviceOccupationInfo {

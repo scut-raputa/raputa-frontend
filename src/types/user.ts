@@ -9,6 +9,8 @@ export interface UserVO {
   createdAt: string
   lastLoginAt?: string
   lastLoginIp?: string
+  lastSeenAt?: string
+  online?: boolean
   avatarUrl?: string
   role: UserRole
 }

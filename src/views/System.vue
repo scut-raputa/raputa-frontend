@@ -45,7 +45,7 @@
             </div>
             <div>
               <dt>设备冲突</dt>
-              <dd>会话锁 + 管理员释放请求</dd>
+              <dd>会话锁 + 释放请求</dd>
             </div>
           </dl>
         </section>
@@ -100,6 +100,19 @@
               </el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="登录状态" width="88">
+            <template #default="{ row }">
+              <el-tooltip
+                v-if="!row.__filler"
+                :content="row.online ? `最近活跃：${formatDateTime(row.lastSeenAt)}` : '当前离线'"
+                placement="top"
+              >
+                <el-tag :type="row.online ? 'success' : 'info'" effect="light" size="small">
+                  {{ row.online ? '在线' : '离线' }}
+                </el-tag>
+              </el-tooltip>
+            </template>
+          </el-table-column>
           <el-table-column label="最近登录" width="145">
             <template #default="{ row }">
               <span v-if="!row.__filler">{{ formatDateTime(row.lastLoginAt) }}</span>
@@ -113,16 +126,26 @@
           <el-table-column label="操作" width="210">
             <template #default="{ row }">
               <template v-if="!row.__filler">
-                <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-                <el-button size="small" type="warning" plain @click="openPasswordDialog(row)">重置密码</el-button>
-                <el-button
-                  size="small"
-                  type="danger"
-                  :disabled="row.id === currentUser?.id"
-                  @click="onDeleteUser(row)"
-                >
-                  删除
-                </el-button>
+                <div class="account-actions">
+                  <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
+                  <el-button size="small" type="warning" plain @click="openPasswordDialog(row)">重置密码</el-button>
+                  <el-tooltip
+                    :disabled="!deleteUserDisabledReason(row)"
+                    :content="deleteUserDisabledReason(row)"
+                    placement="top"
+                  >
+                    <span class="disabled-action-wrapper">
+                      <el-button
+                        size="small"
+                        type="danger"
+                        :disabled="Boolean(deleteUserDisabledReason(row))"
+                        @click="onDeleteUser(row)"
+                      >
+                        删除
+                      </el-button>
+                    </span>
+                  </el-tooltip>
+                </div>
               </template>
             </template>
           </el-table-column>
@@ -159,7 +182,7 @@
           />
         </el-form-item>
         <el-form-item v-if="userDialogMode === 'create'" label="初始密码" prop="password">
-          <el-input v-model="userForm.password" type="password" show-password placeholder="至少 6 位" autocomplete="new-password" />
+          <el-input v-model="userForm.password" type="password" show-password placeholder="至少 8 位" autocomplete="new-password" />
         </el-form-item>
         <el-form-item label="医院名" prop="hospitalName">
           <el-input v-model="userForm.hospitalName" placeholder="请输入医院名" />
@@ -368,6 +391,13 @@ function formatDateTime(iso?: string | null) {
   return iso.slice(0, 19).replace('T', ' ')
 }
 
+function deleteUserDisabledReason(row: UserVO & { __filler?: boolean }) {
+  if (!row || row.__filler) return ''
+  if (row.id === currentUser.value?.id) return '不能删除当前登录账号'
+  if (row.online) return '该账户处于登录状态，不能删除'
+  return ''
+}
+
 function applyUserForm(form: UserFormState | null) {
   userForm.value = { ...(form ?? emptyUserForm()) }
   nextTick(() => userFormRef.value?.clearValidate())
@@ -473,7 +503,11 @@ async function submitPasswordReset() {
 }
 
 async function onDeleteUser(row: UserVO) {
-  if (row.id === currentUser.value?.id) return
+  const disabledReason = deleteUserDisabledReason(row)
+  if (disabledReason) {
+    ElMessage.warning(disabledReason)
+    return
+  }
   try {
     await ElMessageBox.confirm(`确认删除账户【${row.username}】？该操作不可恢复。`, '删除账户', {
       type: 'warning',
@@ -595,6 +629,17 @@ async function onDeleteUser(row: UserVO) {
 }
 .icon-with-margin {
   margin-right: 4px;
+}
+.account-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-actions :deep(.el-button) {
+  margin-left: 0;
+}
+.disabled-action-wrapper {
+  display: inline-flex;
 }
 .password-alert {
   margin-bottom: 16px;

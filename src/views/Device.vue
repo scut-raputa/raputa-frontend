@@ -224,8 +224,8 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { Box, CircleCheck, Connection, Link, Location, Refresh, Search } from '@element-plus/icons-vue'
-import type { DeviceFormData, DeviceRow } from '@/types/department'
-import { forceReleaseDeviceLock, getDeviceLocations, listDevices, updateDevice } from '@/api/department'
+import type { DeviceFormData, DeviceRow } from '@/types/deviceManagement'
+import { forceReleaseDeviceLock, getDeviceLocations, listDevices, updateDevice } from '@/api/deviceManagement'
 import { quickDeviceDiscovery } from '@/api/device'
 
 const PAGE_SIZE = 5

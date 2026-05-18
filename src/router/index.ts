@@ -39,11 +39,7 @@ const routes = [
       {
         path: 'device',
         name: 'DashboardDevice',
-        component: () => import('@/views/Department.vue'),
-      },
-      {
-        path: 'department',
-        redirect: '/dashboard/device',
+        component: () => import('@/views/Device.vue'),
       },
       {
         path: 'system',

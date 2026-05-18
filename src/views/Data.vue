@@ -1,13 +1,13 @@
 <template>
   <div class="data-container">
-    <!-- 控制台 -->
+
     <el-card class="card console-card" shadow="hover">
       <template #header>
         <div class="card-header">患者数据管理控制台</div>
       </template>
 
       <div class="toolbar-panel data-console-toolbar">
-        <!-- 第一行：可过滤多选 -->
+
         <div class="console-row patient-picker-row">
           <el-select-v2
             v-model="selectedPatients"
@@ -39,7 +39,6 @@
           </el-select-v2>
         </div>
 
-        <!-- 第二行：其他条件与按钮 -->
         <div class="console-row console-filter-row">
           <el-input
             v-model="searchId"
@@ -120,7 +119,6 @@
       </div>
     </el-card>
 
-    <!-- 用户卡片分页 -->
     <div class="card-grid">
       <template v-if="paginatedData.length > 0">
         <el-card
@@ -203,7 +201,6 @@
                       {{ group.date }}
                     </div>
 
-                    <!-- 日期下的多个时间段（精确到秒） -->
                     <div
                       v-for="(slot, sIdx) in group.slots"
                       :key="sIdx"
@@ -251,7 +248,6 @@
       </template>
     </div>
 
-    <!-- 分页器 -->
     <div class="pagination-wrapper">
       <el-pagination
         :current-page="page"
@@ -279,30 +275,24 @@ import {
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 
-// ---- 后端返回的数据结构 ----
 type FileItem = { id: string; name: string; type: string }
 type TimeGroup = { time: string; files: FileItem[] }                // HH:mm:ss
 type DateGroup = { date: string; slots: TimeGroup[] }               // yyyy-MM-dd
 type PatientFiles = { id: string; name: string; dates: DateGroup[] }
 
-// 1. 搜索条件
 const searchId = ref('')
 const searchName = ref('')
 const searchFile = ref('')
 const searchDate = ref<Date | null>(null)
 const fileTypes = ref<string[]>([])
 
-// 2. 分页
 const page = ref(1)
 const pageSize = 3
 
-// 所有患者选项（来自 /api/patient）
 const patientOptions = ref<{ value: string; label: string }[]>([])
 
-// 后端返回的 “所有患者 + 文件概览”（没记录的 dates=[]）
 const allData = ref<PatientFiles[]>([])
 
-// 已选患者 & 全选控制
 const selectedPatients = ref<string[]>([])
 const checkAllPatients = ref(false)
 const indeterminatePatients = ref(false)
@@ -339,10 +329,8 @@ watch([selectedPatients, searchDate, fileTypes, searchFile], () => {
   fetchOverview().catch(() => {})
 })
 
-// 5. 当前 el-select 输入框的搜索关键词
 const currentQuery = ref('')
 
-// 6. 实时计算当前匹配的选项（用于判断“全选”状态）
 const matchedOptions = computed<{ value: string; label: string }[]>(() => {
   const lower = currentQuery.value.toLowerCase()
   const list = patientOptions.value ?? []
@@ -351,7 +339,6 @@ const matchedOptions = computed<{ value: string; label: string }[]>(() => {
   )
 })
 
-// 7. 监听 selectedPatients + currentQuery 变化自动更新 check 状态
 watch([selectedPatients, matchedOptions], () => {
   const selectedInView = matchedOptions.value.filter((opt) =>
     selectedPatients.value.includes(opt.value),
@@ -369,12 +356,10 @@ watch([selectedPatients, matchedOptions], () => {
   }
 })
 
-// 8. 自定义过滤方法：只记录输入值，匹配逻辑在 matchedOptions 中完成
 const handleFilterPatients = (query: string) => {
   currentQuery.value = query
 }
 
-// 9. “全选”逻辑（只选当前 view 中匹配的项）
 const handleCheckAllPatients = (val: CheckboxValueType) => {
   indeterminatePatients.value = false
   if (val) {
@@ -391,7 +376,6 @@ const handleCheckAllPatients = (val: CheckboxValueType) => {
   }
 }
 
-// 10. 每个患者的独立筛选条件
 const patientFilters: Record<
   string,
   {
@@ -409,7 +393,6 @@ watchEffect(() => {
   }
 })
 
-// 11. 卡片内部文件过滤逻辑
 function getFilteredGroupsByDate(patient: PatientFiles) {
   const filter = patientFilters[patient.id]
   if (!filter) return []
@@ -442,8 +425,6 @@ function getFilteredGroupsByDate(patient: PatientFiles) {
   return res
 }
 
-
-// 12. 控制台过滤数据（基于 searchXXX 条件）
 const filteredData = computed(() => {
   return allData.value
     .filter((patient) => {
@@ -456,7 +437,6 @@ const filteredData = computed(() => {
     })
 })
 
-// 13. 分页数据
 const paginatedData = computed(() => {
   const start = (page.value - 1) * pageSize
   return filteredData.value.slice(start, start + pageSize)
@@ -469,7 +449,6 @@ watchEffect(() => {
   }
 })
 
-// 14. 下载与导出
 function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -481,7 +460,6 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-// 1) 单文件下载（用 fileId）
 async function onDownload(fileName: string, fileId: string) {
   try {
     const { data } = await axios.get('/api/download/file', {
@@ -494,8 +472,6 @@ async function onDownload(fileName: string, fileId: string) {
   }
 }
 
-// 2) 单个患者 批量下载（打包 ZIP）
-// 读取患者卡片里的筛选条件：patientFilters[patient.id]
 async function onExportSinglePatient(user: string, patientId: string) {
   try {
     const f = patientFilters[patientId]
@@ -518,7 +494,6 @@ async function onExportSinglePatient(user: string, patientId: string) {
   }
 }
 
-// 3) 全部 批量下载（控制台筛选为准）
 async function onExportAll() {
   try {
     const payload: any = {
@@ -665,7 +640,7 @@ async function onExportAll() {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-right: 4px; /* 避免滚动条遮挡内容 */
+  padding-right: 4px;
 }
 
 .patient-controls {
