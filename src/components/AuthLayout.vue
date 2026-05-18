@@ -1,10 +1,8 @@
-<!-- src/components/AuthLayout.vue -->
 <template>
   <div class="auth-layout">
     <div class="background" />
     <div class="auth-container">
       <header class="auth-header">
-        <img src="@/assets/logo.svg" alt="Logo" class="logo" />
         <h1 class="title">吞咽障碍智能检测系统</h1>
       </header>
       <main class="auth-content">
@@ -40,15 +38,10 @@
 
 .auth-header {
   position: absolute;
-  top: 1.5rem;
-  left: 1.5rem;
+  top: 2rem;
+  left: 2rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-}
-.logo {
-  width: 56px;
-  height: 56px;
 }
 .title {
   color: #fff;

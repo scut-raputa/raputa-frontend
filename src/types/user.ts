@@ -9,6 +9,8 @@ export interface UserVO {
   createdAt: string
   lastLoginAt?: string
   lastLoginIp?: string
+  lastSeenAt?: string
+  online?: boolean
   avatarUrl?: string
   role: UserRole
 }
@@ -26,6 +28,33 @@ export interface LoginPayload {
 }
 
 export interface LoginData {
-  token: string
+  token?: string | null
   user: UserVO
+}
+
+export interface UserQueryParams {
+  page: number
+  size: number
+  username?: string
+  hospitalName?: string
+  departmentName?: string
+  role?: UserRole
+}
+
+export interface UserFormData {
+  username?: string
+  password?: string
+  hospitalName: string
+  departmentName: string
+  role: UserRole
+}
+
+export interface PasswordResetPayload {
+  adminPassword: string
+  newPassword: string
+}
+
+export interface PageResp<T> {
+  items: T[]
+  total: number
 }

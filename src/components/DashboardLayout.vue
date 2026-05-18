@@ -1,10 +1,9 @@
 <template>
   <div class="common-layout">
     <el-container>
-      <!-- 顶栏 -->
+
       <el-header class="header">
         <div class="header-left">
-          <img src="@/assets/logo.svg" class="logo" alt="Logo" />
           <span class="system-name">吞咽障碍智能检测系统</span>
         </div>
         <div class="header-right">
@@ -63,7 +62,7 @@
       </el-header>
 
       <el-container>
-        <!-- 侧栏 -->
+
         <el-aside :class="['sidebar', isCollapsed ? 'collapsed' : '']">
           <el-menu
             v-model="activeMenu"
@@ -77,10 +76,10 @@
               <el-icon><User /></el-icon>
               <template #title>患者管理</template>
             </el-menu-item>
-            <!-- <el-menu-item index="/dashboard/model">
+            <el-menu-item index="/dashboard/model">
               <el-icon><DataLine /></el-icon>
               <template #title>模型管理</template>
-            </el-menu-item> -->
+            </el-menu-item>
             <el-menu-item index="/dashboard/monitor">
               <el-icon><Loading /></el-icon>
               <template #title>系统监测</template>
@@ -93,14 +92,14 @@
               <el-icon><Histogram /></el-icon>
               <template #title>数据统计</template>
             </el-menu-item>
-            <!-- <el-menu-item v-if="!isAdmin" index="/dashboard/department">
+            <el-menu-item index="/dashboard/device">
               <el-icon><Setting /></el-icon>
-              <template #title>科室管理</template>
-            </el-menu-item> -->
-            <!-- <el-menu-item v-else index="/dashboard/system">
+              <template #title>设备管理</template>
+            </el-menu-item>
+            <el-menu-item v-if="isAdmin" index="/dashboard/system">
               <el-icon><Setting /></el-icon>
               <template #title>系统管理</template>
-            </el-menu-item> -->
+            </el-menu-item>
             <div class="el-menu-item toggle-item" @click="toggleCollapse">
               <el-icon>
                 <component :is="isCollapsed ? Expand : Fold" />
@@ -112,7 +111,6 @@
           </el-menu>
         </el-aside>
 
-        <!-- 主体内容 -->
         <el-main :class="{ collapsed: isCollapsed }">
           <div class="main-inner">
             <router-view />
@@ -126,16 +124,17 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getUser, clearToken, clearUser } from '@/utils/auth'
+import { getUser, clearUser } from '@/utils/auth'
+import { logoutUser } from '@/api/user'
 import type { UserVO } from '@/types/user'
 import {
   Fold,
   Expand,
-  // DataLine,
+  DataLine,
   User,
   Document,
   Loading,
-  // Setting,
+  Setting,
   Histogram,
   SwitchButton,
 } from '@element-plus/icons-vue'
@@ -145,7 +144,9 @@ const router = useRouter()
 const route = useRoute()
 
 const currentUser = ref<UserVO | null>(getUser())
-const avatarUrl = ref<string>(resolveResourceUrl(currentUser.value?.avatarUrl))
+const avatarUrl = computed(() =>
+  resolveResourceUrl(currentUser.value?.avatarUrl, currentUser.value?.role),
+)
 const lastLoginAtDisplay = computed(() =>
   formatDateTime(currentUser.value?.lastLoginAt),
 )
@@ -153,7 +154,7 @@ const isCollapsed = ref(false)
 const activeMenu = ref(route.path)
 const scrollAreaRef = ref<HTMLElement | null>(null)
 
-// const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
+const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 
 watch(
   () => route.path,
@@ -166,10 +167,12 @@ onMounted(() => {
   activeMenu.value = route.path
 })
 
-function logout() {
+async function logout() {
   ElMessage.success({ message: '已登出，正在跳转到登录页', duration: 1500 })
-  setTimeout(() => {
-    clearToken()
+  setTimeout(async () => {
+    try {
+      await logoutUser()
+    } catch {}
     clearUser()
     router.push('/login')
   }, 1500)
@@ -188,11 +191,20 @@ function onMenuSelect(index: string) {
   }
 }
 
-function resolveResourceUrl(path?: string) {
+function defaultAvatarPath(role?: string) {
+  return role === 'ADMIN'
+    ? '/images/avatar-admin.png'
+    : '/images/avatar-department.png'
+}
+
+function resolveResourceUrl(path?: string, role?: string) {
   const BASE = 'http://localhost:8080'
-  if (!path || path.trim() === '') return `${BASE}/images/default-avatar.png`
-  if (path.startsWith('http://') || path.startsWith('https://')) return path
-  return `${BASE}${path.startsWith('/') ? '' : '/'}${path}`
+  const raw = path?.trim()
+  const normalized = raw || defaultAvatarPath(role)
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return normalized
+  }
+  return `${BASE}${normalized.startsWith('/') ? '' : '/'}${normalized}`
 }
 
 function formatDateTime(iso?: string | null) {
@@ -226,7 +238,6 @@ body {
   overflow-y: visible;
 }
 
-/* 顶栏固定 */
 .el-header {
   position: fixed;
   top: 0;
@@ -238,21 +249,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.5rem;
+  padding: 0 2rem;
   box-sizing: border-box;
   z-index: 1000;
 }
 .header-left {
   display: flex;
   align-items: center;
-}
-.logo {
-  height: 36px;
-  margin-right: 0.5rem;
+  min-width: 0;
 }
 .system-name {
   font-size: 1.25rem;
   font-weight: bold;
+  padding-left: 0.25rem;
 }
 .header-right {
   display: flex;
@@ -271,7 +280,6 @@ body {
   border-radius: 0.375rem !important;
 }
 
-/* 主体布局容器 */
 .el-container:not(.is-vertical) {
   display: flex;
   flex-direction: row;
@@ -282,7 +290,6 @@ body {
   position: relative;
 }
 
-/* 侧栏固定 */
 .el-aside {
   position: fixed;
   top: 80px;
@@ -303,7 +310,6 @@ body {
   display: none;
 }
 
-/* 菜单样式 */
 :deep(.el-menu) {
   border-right: none;
   background-color: transparent;
@@ -358,13 +364,14 @@ body {
   justify-content: center;
 }
 
-/* 主内容区 */
 .el-main {
   margin-left: 200px;
   display: flex;
   justify-content: center;
   align-items: flex-start;
   box-sizing: border-box;
+  width: calc(100vw - 200px);
+  max-width: calc(100vw - 200px);
   padding: 2rem 1rem;
   background-color: #f9fafb;
   min-height: calc(100vh - 80px);
@@ -373,24 +380,24 @@ body {
 }
 .el-main.collapsed {
   margin-left: 64px;
+  width: calc(100vw - 64px);
+  max-width: calc(100vw - 64px);
 }
 
-/* 内部内容容器 */
 .main-inner {
-  min-width: 960px;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
   margin-top: auto;
   margin-bottom: auto;
 }
 
-/* 卡片组件 */
 :deep(.el-card) {
   min-width: 360px;
   flex-shrink: 0;
 }
 
-/* 用户信息卡片 */
 .user-dropdown-card {
   width: 20rem;
   padding: 0;

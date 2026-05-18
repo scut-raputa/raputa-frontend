@@ -8,8 +8,9 @@
         :rules="rules"
         class="register-form"
         label-width="0"
+        @keyup.enter.prevent="onSubmit"
       >
-        <!-- 医院名 -->
+
         <el-form-item prop="hospitalName">
           <el-input
             v-model="form.hospitalName"
@@ -23,7 +24,6 @@
           </el-input>
         </el-form-item>
 
-        <!-- 科室名 -->
         <el-form-item prop="departmentName">
           <el-input
             v-model="form.departmentName"
@@ -37,7 +37,6 @@
           </el-input>
         </el-form-item>
 
-        <!-- 用户名（科室登录名） -->
         <el-form-item prop="username">
           <el-input
             v-model="form.username"
@@ -51,7 +50,6 @@
           </el-input>
         </el-form-item>
 
-        <!-- 密码 -->
         <el-form-item prop="password">
           <el-input
             v-model="form.password"
@@ -67,7 +65,6 @@
           </el-input>
         </el-form-item>
 
-        <!-- 确认密码 -->
         <el-form-item prop="confirmPassword">
           <el-input
             v-model="form.confirmPassword"
@@ -83,7 +80,6 @@
           </el-input>
         </el-form-item>
 
-        <!-- 提交按钮与跳转链接（和 Login.vue 一样的布局） -->
         <el-form-item>
           <el-button
             class="submit-btn"
@@ -249,7 +245,7 @@ async function onSubmit(): Promise<void> {
       } else if (status === 403) {
         ElMessage.error(serverMsg || '账号已停用或无权限')
       } else if (status === 0 || !status) {
-        // 网络层错误（超时、断网、CORS 等）
+
         ElMessage.error('网络错误，请稍后重试')
       } else {
         ElMessage.error(serverMsg || `注册失败（${status}）`)
@@ -276,13 +272,13 @@ async function onSubmit(): Promise<void> {
   font-size: 1.5rem;
   color: #333;
 }
-/* 与 Login.vue 保持一致的纵向间距 */
+
 .register-form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
-/* 与 Login.vue 一样：按钮 100% 宽 */
+
 .submit-btn {
   display: block;
   width: 100%;
@@ -290,7 +286,7 @@ async function onSubmit(): Promise<void> {
 .icon-with-margin {
   margin-right: 4px;
 }
-/* 与 Login.vue 一样：按钮与链接之间的距离 */
+
 .link-row {
   margin-top: 0.5rem;
 }

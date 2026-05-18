@@ -16,27 +16,35 @@
         <div class="base-info-grid">
           <div class="info-item info-compact">
             <span class="info-label">姓名：</span>
-            <span class="info-value">{{ report.name }}</span>
+            <span class="info-value">{{ report.name || '-' }}</span>
           </div>
           <div class="info-item info-compact">
             <span class="info-label">性别：</span>
-            <span class="info-value">{{ report.gender }}</span>
+            <span class="info-value">{{ report.gender || '-' }}</span>
           </div>
           <div class="info-item info-compact">
             <span class="info-label">年龄：</span>
-            <span class="info-value">{{ report.age }} 岁</span>
+            <span class="info-value">{{ ageLabel }}</span>
           </div>
           <div class="info-item info-medium">
-            <span class="info-label">门诊号：</span>
-            <span class="info-value">{{ report.outpatientId }}</span>
+            <span class="info-label">预约编号：</span>
+            <span class="info-value">{{ report.outpatientId || '-' }}</span>
           </div>
           <div class="info-item info-medium">
-            <span class="info-label">所在科室：</span>
-            <span class="info-value">{{ report.department }}</span>
+            <span class="info-label">预约日期：</span>
+            <span class="info-value">{{ report.appointmentTime || '-' }}</span>
+          </div>
+          <div class="info-item info-medium">
+            <span class="info-label">预约科室：</span>
+            <span class="info-value">{{ report.appointmentDept || '-' }}</span>
+          </div>
+          <div class="info-item info-medium">
+            <span class="info-label">检查科室：</span>
+            <span class="info-value">{{ report.checkDept || '-' }}</span>
           </div>
           <div class="info-item info-full">
             <span class="info-label">检测时间：</span>
-            <span class="info-value">{{ report.date }}</span>
+            <span class="info-value">{{ report.date || '-' }}</span>
           </div>
         </div>
       </div>
@@ -77,6 +85,13 @@
         </table>
         <p v-else>{{ emptyEventText }}</p>
       </div>
+
+      <div class="report-section notice-section">
+        <h4>{{ noteTitle }}</h4>
+        <p>
+          {{ noteText }}
+        </p>
+      </div>
     </div>
 
     <div class="report-section suggestion-section">
@@ -90,20 +105,20 @@
     </div>
 
     <div class="spacer" />
-      <div class="report-footer">
-        <div class="doctor-field">
-          <span>{{ doctorLabel }}：</span>
-          <template v-if="editingMode">
-            <input
-              v-model="doctorText"
-              class="doctor-input editable"
-              :placeholder="`请填写${doctorLabel}`"
-            />
-          </template>
-          <span v-else class="doctor-plain">{{ doctorText }}</span>
-        </div>
-        <div class="report-time">报告时间：{{ report.time }}</div>
+    <div class="report-footer">
+      <div class="doctor-field">
+        <span>{{ doctorLabel }}：</span>
+        <template v-if="editingMode">
+          <input
+            v-model="doctorText"
+            class="doctor-input editable"
+            :placeholder="`请填写${doctorLabel}`"
+          />
+        </template>
+        <span v-else class="doctor-plain">{{ doctorText }}</span>
       </div>
+      <div class="report-time">报告时间：{{ report.time }}</div>
+    </div>
     <hr class="divider" />
   </div>
 </template>
@@ -112,18 +127,15 @@
 import { computed, ref, watch } from 'vue'
 import { getUser } from '@/utils/auth'
 
-export interface ReportEvent {
-  start: number
-  end: number
-}
-
-export interface ReportData {
+export interface ScreeningReportData {
   taskType?: 'dys' | 'asp'
   name: string
   gender: string
   age: number
   outpatientId: string
-  department: string
+  appointmentDept?: string
+  checkDept?: string
+  appointmentTime?: string
   date: string
   reportId: string
   totalSwallows: number
@@ -131,8 +143,8 @@ export interface ReportData {
   abnormalSwallows: number
   dysphagiaSwallows: number
   aspirationSwallows: number
-  dysphagiaEvents?: ReportEvent[]
-  aspirationEvents?: ReportEvent[]
+  dysphagiaEvents?: Array<{ start: number; end: number }>
+  aspirationEvents?: Array<{ start: number; end: number }>
   diagnosis: string
   riskLevel: string
   suggestions: string[]
@@ -144,14 +156,17 @@ const user = getUser()
 const hospitalName = user?.hospitalName || 'xx医院'
 
 const { report, editingMode = true } = defineProps<{
-  report: ReportData
+  report: ScreeningReportData
   editingMode?: boolean
 }>()
 
 const reportContent = ref<HTMLDivElement | null>(null)
 const suggestionText = ref(report.suggestions.join('\n'))
-
 const doctorText = ref(report.doctor || '')
+
+const ageLabel = computed(() => (
+  Number.isFinite(report.age) && report.age > 0 ? `${report.age} 岁` : '-'
+))
 
 const isAspirationReport = computed(() => report.taskType === 'asp')
 const reportTitle = computed(() =>
@@ -198,6 +213,14 @@ const emptyEventText = computed(() =>
     ? '本次检测未记录到误吸事件。'
     : '本次筛查未记录到吞咽障碍事件。'
 )
+const noteTitle = computed(() =>
+  isAspirationReport.value ? '检测说明' : '筛查说明'
+)
+const noteText = computed(() =>
+  isAspirationReport.value
+    ? '本报告仅反映本次检测过程中模型提示的误吸相关事件，需结合临床表现、医嘱和必要的进一步检查综合判断。'
+    : '本报告为吞咽功能筛查结果，不替代正式临床诊断；如筛查提示异常，建议结合临床评估或专科会诊进一步确认。'
+)
 
 function formatSeconds(value: number) {
   return `${Number(value || 0).toFixed(2)} s`
@@ -210,6 +233,17 @@ watch(
       doctorText.value = val
     }
   }
+)
+
+watch(
+  () => report.suggestions,
+  (val) => {
+    const next = val.join('\n')
+    if (next !== suggestionText.value) {
+      suggestionText.value = next
+    }
+  },
+  { deep: true }
 )
 
 defineExpose({
@@ -345,6 +379,10 @@ defineExpose({
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.notice-section p {
+  margin-bottom: 0;
 }
 
 .suggestion-section {

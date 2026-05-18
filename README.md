@@ -1,58 +1,60 @@
-# RAPUTA Frontend
+# Raputa Frontend
 
-## Project Overview
+Raputa frontend is a Vue 3 application for dysphagia screening and aspiration detection workflows. It talks to the Spring Boot backend through `/api` and `/ws`; model services are called by the backend, not by the browser directly.
 
-**RAPUTA** (Real-time AI Platform for Unobtrusive Triaging of Airway) is a Vue.js–based frontend for intelligent, non-invasive screening of dysphagia and aspiration risk. It provides clinicians with interactive views to manage patients, monitor real-time physiological signals, run assisted analyses (real-time or file-based), and export structured reports. The frontend connects to backend services for data handling, model execution, and device communication.
+## Stack
 
----
+- Vue 3 + TypeScript + Vite
+- Element Plus
+- ECharts
+- Axios
+- SockJS/STOMP for real-time updates
+- html2pdf.js for report export
 
-## Key Functional Modules
+## Start
 
-### Patient Management
+```bash
+npm install
+npm run dev
+```
 
-Create, view, and edit patient records and appointment schedules. The system automatically maintains organized storage directories per patient (and per date) for raw signals, reports, and attachments, and links historical check records to each patient.
+Default development URL:
 
-### Model Management
+```text
+http://localhost:5173
+```
 
-Upload, select, and manage AI detection models used in screening. The module provides **model performance summaries** (e.g., accuracy, sensitivity/recall, specificity) to help users choose the most suitable model for a task.
+The Vite dev proxy forwards:
 
-### System Monitoring
+- `/api` to `http://localhost:8080`
+- `/ws` to `http://localhost:8080`
 
-Run and control screening tasks in **two modes**:
+Start the backend before logging in. If the backend is not running, Vite may print proxy `ECONNREFUSED` messages for `/api/user/me`; that means the browser asked for the current login session but nothing was listening on port `8080`.
 
-* **Real-time Mode:** Stream laryngeal motion, swallowing sound, and airflow/respiration signals from connected devices; configure detection parameters; visualize segmentation and risk levels; export structured reports.
-* **File Mode:** **Select files online** (local upload or server-side selection) and run offline detection with the same visualization and report export pipeline.
+## Build
 
-### Data Management
+```bash
+npm run build
+```
 
-Browse historical data organized by **patient / task / date**. Filter, preview, and download raw signals and reports to support review and audit.
+The build runs TypeScript checks first and then creates `dist/`. Heavy dependencies are split into vendor chunks so report export, charts, Element Plus, and real-time messaging do not all land in one bundle.
 
-### Data Statistics
+## Main Views
 
-A concise operational dashboard with:
+- `Login.vue` and `Register.vue`: account entry pages.
+- `Patient.vue`: patient records, appointments, and patient check history.
+- `Monitor.vue`: real-time and file-mode detection. It supports dysphagia screening and aspiration detection, automatic and manual swallow segmentation, device selection, report export, screening-to-patient archiving, and post-detection chart zooming.
+- `Model.vue`: model runtime monitoring. It checks the dysphagia and aspiration model APIs and shows loaded, available, and reachable model states.
+- `Data.vue`: patient data files, report downloads, and session file browsing.
+- `Stats.vue`: daily patient counts, result distribution, department proportions, and device usage statistics.
+- `Device.vue`: device asset and session management. Device identity, IP, and online state are maintained by backend discovery; editable fields are device name, storage/deployment location, and remarks.
+- `System.vue`: administrator account management, including user creation, role/department/hospital updates, password reset, and guarded deletion. Current or online accounts cannot be deleted from the UI.
 
-* Patient screening trends and charts
-* Device overview (online/offline status and recent history)
+## Development Notes
 
-### Department Management / System Management (Role-Based)
-
-Capabilities vary by login role:
-
-* **Department User (department-scoped account):**
-
-  * Manage **devices within the department** (discovery, connect/disconnect, status).
-  * **View** department doctors’ information (read-only).
-  * Update **personal profile** (password, avatar, etc.).
-* **System Administrator:**
-
-  * Interface switches to **System Management**.
-  * **Edit** all users (departments) and **edit** all doctors across the system.
-  * Perform global configuration for departments, accounts, and devices.
-
----
-
-## Tech Stack
-
-* **Frontend:** Vue 3, TypeScript, Element Plus, ECharts
-* **Integration:** RESTful APIs to backend services for data I/O, model execution, and device control
-* **Reporting:** Structured result views with PDF export
+- Keep browser authentication based on the backend session cookie. Do not reintroduce `localStorage` login state.
+- Device release requests are delivered through backend session state and WebSocket messages.
+- File-mode detection expects the current standard three-file input: IMU, airflow, and audio.
+- In real-time mode, device selection depends on backend discovery and device session locks. A device can be occupied by only one active browser session.
+- Reports are generated in the browser and then uploaded through the backend when needed.
+- Chart highlight regions are stored in frontend state and should survive stop/release/report actions. During live detection, chart zooming is disabled; after detection stops, zooming is available for review.

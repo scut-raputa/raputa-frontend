@@ -14,8 +14,35 @@ export default defineConfig({
     },
   },
   define: {
-    // 修复 SockJS 在 Vite 中的兼容性问题
     global: 'globalThis',
+  },
+  build: {
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
+          if (id.includes('element-plus') || id.includes('@element-plus')) {
+            return 'vendor-element-plus'
+          }
+          if (id.includes('echarts') || id.includes('zrender') || id.includes('vue-echarts')) {
+            return 'vendor-charts'
+          }
+          if (id.includes('html2pdf.js') || id.includes('html2canvas') || id.includes('jspdf')) {
+            return 'vendor-report'
+          }
+          if (id.includes('@stomp') || id.includes('sockjs-client')) {
+            return 'vendor-realtime'
+          }
+          if (id.includes('vue')) {
+            return 'vendor-vue'
+          }
+          return 'vendor'
+        },
+      },
+    },
   },
   server: {
     proxy: {
@@ -32,14 +59,12 @@ export default defineConfig({
           })
         },
       },
-      // WebSocket 代理 - 用于实时数据推送
       '/ws': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        ws: true, // 启用 WebSocket 代理
+        ws: true,
         secure: false,
       },
-      // 检测接口代理 - 用于文件上传和检测
       '/detect': {
         target: 'http://222.201.187.184:8000',
         changeOrigin: true,

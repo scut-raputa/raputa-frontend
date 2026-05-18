@@ -1,25 +1,31 @@
-export type ModelRow = {
-  id: string
-  func: string
-  name: string
-  uploadTime: string
-  uploader: string
-  remark: string
-  accuracy?: number | null
-  sensitivity?: number | null
-  specificity?: number | null
-}
-
-export type ListModelsParams = {
-  page: number
-  size: number
-  func?: string
+export type RuntimeListParams = {
   name?: string
-  uploader?: string
-  date?: string
+  taskType?: string
+  loaded?: boolean
+  available?: boolean
 }
 
-export type PageResp<T> = {
-  items: T[]
-  total: number
+export type RuntimeModelRow = {
+  name: string
+  taskType: string
+  modelVersion: string
+  deployPath: string
+  loaded: boolean
+  serviceLive: boolean
+  serviceReady: boolean
+  device: string
+  serviceName: string
+  lastHealthCheckAt: string
+  lastHealthError?: string | null
+}
+
+export type RuntimeSummary = {
+  serviceLive: boolean
+  serviceReady: boolean
+  discoveredModelCount: number
+  loadedModelCount: number
+  availableModelCount: number
+  unavailableModelCount: number
+  lastHealthCheckAt: string
+  lastHealthError?: string | null
 }

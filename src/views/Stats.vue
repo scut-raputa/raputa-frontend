@@ -1,10 +1,10 @@
 <template>
   <div class="home-container">
     <div class="grid-wrapper">
-      <!-- 折线图 -->
+
       <el-card shadow="hover" class="card chart-card">
         <template #header>
-          <div class="card-header">每日检测患者数量</div>
+          <div class="card-header">每日检测患者数（去重）</div>
         </template>
         <v-chart
           :option="lineOption"
@@ -14,10 +14,9 @@
         />
       </el-card>
 
-      <!-- 柱形图 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
-          <div class="card-header">每日患者检测结果情况</div>
+          <div class="card-header">每日检测结果分布</div>
         </template>
         <v-chart
           :option="barOption"
@@ -27,10 +26,9 @@
         />
       </el-card>
 
-      <!-- 饼图 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
-          <div class="card-header">各科室吞咽相关疾病人群占比</div>
+          <div class="card-header">各科室检测患者占比</div>
         </template>
         <v-chart
           :option="pieOption"
@@ -40,10 +38,9 @@
         />
       </el-card>
 
-      <!-- 设备状态 -->
       <el-card shadow="hover" class="card chart-card">
         <template #header>
-          <div class="card-header">每日设备使用时长</div>
+          <div class="card-header">每日设备使用时长（会话）</div>
         </template>
         <v-chart
           :option="riverOption"
@@ -57,7 +54,15 @@
 </template>
 
 <script setup lang="ts">
-import { lineData, barData, pieData } from '@/mock/StatsData'
+import { ref, onMounted, computed } from 'vue'
+import { getStats } from '@/api/stats'
+import type {
+  DailyPatientCount,
+  DailyCheckResult,
+  DeptPatientCount,
+  DeviceUsage,
+} from '@/api/stats'
+import { ElMessage } from 'element-plus'
 import { use } from 'echarts/core'
 import { BarChart, LineChart, PieChart, SunburstChart } from 'echarts/charts'
 import {
@@ -80,12 +85,68 @@ use([
   SVGRenderer,
 ])
 
-// 图表配置
-const lineOption = {
+const lineData = ref<DailyPatientCount[]>([])
+const barData = ref<DailyCheckResult[]>([])
+const pieData = ref<DeptPatientCount[]>([])
+const deviceUsageData = ref<DeviceUsage[]>([])
+const loading = ref(false)
+
+function formatDateMMDD(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}-${day}`
+}
+
+function generateDateLabels(days: number): string[] {
+  const labels: string[] = []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(today.getDate() - i)
+    labels.push(formatDateMMDD(date))
+  }
+
+  return labels
+}
+
+const loadStats = async () => {
+  loading.value = true
+  try {
+    const days = 7
+    const data = await getStats({ days })
+
+    const dateLabels = generateDateLabels(days)
+
+    lineData.value = (data.dailyPatientCount || []).map((item, index) => ({
+      ...item,
+      category: dateLabels[index] || item.category,
+    }))
+
+    barData.value = (data.dailyCheckResult || []).map((item, index) => ({
+      ...item,
+      category: dateLabels[index] || item.category,
+    }))
+
+    pieData.value = data.deptPatientCount || []
+    deviceUsageData.value = data.deviceUsage || []
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+    ElMessage.error('获取统计数据失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadStats()
+})
+const lineOption = computed(() => ({
   grid: { top: 8, bottom: 8, containLabel: true },
   xAxis: {
     type: 'category',
-    data: lineData.map((d) => d.category),
+    data: lineData.value.map((d) => d.category),
     boundaryGap: ['5%', '5%'],
   },
   yAxis: {
@@ -101,7 +162,7 @@ const lineOption = {
   series: [
     {
       type: 'line',
-      data: lineData.map((d) => d.value),
+      data: lineData.value.map((d) => d.value),
       smooth: true,
       symbol: 'circle',
       symbolSize: 6,
@@ -110,22 +171,21 @@ const lineOption = {
       areaStyle: { opacity: 0.08 },
     },
   ],
-}
-const barOption = {
-  // 为了避免 legend 和 x 轴重叠，把 bottom 提高一些
+}))
+
+const barOption = computed(() => ({
   grid: { top: 8, bottom: 40, containLabel: true },
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-  // 让图例离 x 轴有空隙
   legend: { bottom: 0 },
   xAxis: {
     type: 'category',
-    data: barData.map((d) => d.category),
+    data: barData.value.map((d) => d.category),
     axisTick: { alignWithLabel: true },
     boundaryGap: true,
   },
   yAxis: {
     type: 'value',
-    name: '人数',
+    name: '结果数',
     nameLocation: 'middle',
     nameGap: 40,
     axisLine: { show: true },
@@ -136,111 +196,86 @@ const barOption = {
     {
       name: '正常',
       type: 'bar',
-      stack: 'total', // ★ 开启堆叠
-      data: barData.map((d) => d.normal),
-      // barWidth 不指定也可，指定能更稳一些
+      stack: 'total',
+      data: barData.value.map((d) => d.normal),
       barMaxWidth: 24,
       itemStyle: { color: '#91CC75' },
     },
     {
       name: '吞咽障碍',
       type: 'bar',
-      stack: 'total', // ★ 同一 stack 名称
-      data: barData.map((d) => d.dysphagia),
+      stack: 'total',
+      data: barData.value.map((d) => d.dysphagia),
       barMaxWidth: 24,
-      itemStyle: { color: '#5470C6' },
+      itemStyle: { color: '#F59E0B' },
     },
     {
       name: '误吸',
       type: 'bar',
       stack: 'total',
-      data: barData.map((d) => d.overt),
+      data: barData.value.map((d) => d.aspiration),
       barMaxWidth: 24,
-      itemStyle: { color: '#EE6666' },
+      itemStyle: { color: '#EF4444' },
     },
-    // {
-    //   name: '隐性误吸',
-    //   type: 'bar',
-    //   stack: 'total',
-    //   data: barData.map((d) => d.silent),
-    //   barMaxWidth: 24,
-    //   itemStyle: { color: '#FAC858' },
-    // },
   ],
-  // 堆叠时这两个间距不再重要，但保留也无妨
   barCategoryGap: '30%',
   barGap: '20%',
-}
-const pieOption = {
+}))
+
+const pieOption = computed(() => ({
   tooltip: { trigger: 'item' },
   series: [
     {
       name: '各科室吞咽障碍人群占比',
       type: 'pie',
-      radius: [25, '75%'],
+      radius: '66%',
       center: ['50%', '50%'],
-      roseType: 'radius',
-      data: pieData,
+      data: pieData.value,
       label: {
         formatter: '{b}\n{c} ({d}%)',
         fontSize: 12,
+        distanceToLabelLine: 10,
       },
-      labelLine: { smooth: true, length: 10, length2: 8 },
+      labelLine: { smooth: true, length: 24, length2: 18 },
       emphasis: {
         itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' },
       },
     },
   ],
-}
+}))
 
-// —— 假数据：设备列表与近 7 天（与折线图同源的 7 个横轴刻度）——
-const deviceIds = ['DEV-001', 'DEV-002', 'DEV-003', 'DEV-004']
-const days = lineData.map((d) => d.category) // ['周日','周一',...,'周六']
+const days = computed(() => lineData.value.map((d) => d.category))
 
-// 每台设备 7 天的使用时长（小时）
-const deviceUsage: Record<string, number[]> = {
-  'DEV-001': [3.5, 4, 5, 4.5, 6, 5.5, 4.2],
-  'DEV-002': [2, 2.5, 3, 3.2, 3.8, 3.5, 2.8],
-  'DEV-003': [1.5, 2, 2.2, 2.8, 3, 2.5, 2],
-  'DEV-004': [0.8, 1, 1.2, 1.5, 1.6, 1.4, 1.1],
-}
-
-// 为不同设备准备一组柔和但可区分的配色（可按需调整）
 const DEVICE_COLORS = ['#60A5FA', '#34D399', '#A78BFA', '#F472B6']
 
-// —— 河流图（堆叠面积流式效果）——
-const riverOption = {
+const riverOption = computed(() => ({
   grid: { top: 8, bottom: 40, containLabel: true },
-
   tooltip: {
     trigger: 'axis',
     axisPointer: { type: 'line' },
     formatter: (params: any) => {
       const day = params?.[0]?.axisValueLabel ?? ''
       const lines = params
-        .map((p: any) => `${p.marker} ${p.seriesName}：${p.data} 小时`)
+        .map((p: any) => `${p.marker} ${p.seriesName}：${p.data} 分钟`)
         .join('<br/>')
       const total = params.reduce(
         (s: number, p: any) => s + (Number(p.data) || 0),
         0,
       )
-      return `${day}<br/>${lines}<br/><b>总计：${total.toFixed(1)} 小时</b>`
+      return `${day}<br/>${lines}<br/><b>总计：${total.toFixed(1)} 分钟</b>`
     },
     confine: true,
   },
-
-  // ↓ 图例放在底部，并且如果设备多可用 scroll 避免挤压
   legend: { bottom: 0 },
-
   xAxis: {
     type: 'category',
-    data: days,
+    data: days.value,
     boundaryGap: false,
     axisTick: { alignWithLabel: true },
   },
   yAxis: {
     type: 'value',
-    name: '小时',
+    name: '分钟',
     nameLocation: 'middle',
     nameGap: 40,
     min: 0,
@@ -248,9 +283,8 @@ const riverOption = {
     axisTick: { show: true },
     splitLine: { show: true },
   },
-
-  series: deviceIds.map((devId, i) => ({
-    name: devId,
+  series: deviceUsageData.value.map((device, i) => ({
+    name: device.deviceId,
     type: 'line',
     stack: 'usage',
     smooth: true,
@@ -259,10 +293,10 @@ const riverOption = {
     lineStyle: { width: 0.5, opacity: 0.6 },
     itemStyle: { color: DEVICE_COLORS[i % DEVICE_COLORS.length] },
     emphasis: { focus: 'series' },
-    data: deviceUsage[devId],
+    data: device.usageMinutes,
     z: 1,
   })),
-}
+}))
 </script>
 
 <style scoped>
@@ -273,13 +307,15 @@ const riverOption = {
 }
 .grid-wrapper {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
-  min-width: 1200px;
+  width: min(1304px, calc(100vw - 260px));
+  max-width: 100%;
+  min-width: 0;
 }
 .card {
-  min-width: 580px;
-  max-width: 640px;
+  min-width: 0;
+  max-width: none;
   padding: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transition: box-shadow 0.3s;
@@ -325,9 +361,10 @@ const riverOption = {
 }
 .controls-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   margin-bottom: 12px;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

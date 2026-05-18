@@ -8,14 +8,24 @@ export interface PatientQuery {
   id?: string
   name?: string
   dept?: string
-  address?: string
   gender?: '男' | '女'
   checked?: boolean
+  admit?: string
+  onsetDate?: string
+  pastHistory?: string
+  bedNumber?: string
+  course?: string
 }
 
 export interface UpdatePatientPayload {
+  name: string
+  gender: '男' | '女'
   dept: string
-  address: string
+  idCard: string
+  onsetDate: string
+  pastHistory: string
+  bedNumber: string
+  course: string
 }
 
 export async function patchJson<T>(url: string, data?: any, config?: any) {
@@ -41,9 +51,12 @@ export async function getPatientById(id: string): Promise<PatientRow | null> {
 export interface CreatePatientPayload {
   name: string
   gender: '男' | '女'
-  birth: string
   dept: string
-  address: string
+  idCard: string
+  onsetDate: string
+  pastHistory: string
+  bedNumber: string
+  course: string
 }
 
 export async function createPatient(payload: CreatePatientPayload) {

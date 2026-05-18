@@ -1,4 +1,4 @@
-export type CheckResult = '吞咽障碍' | '显性误吸' | '隐性误吸' | '正常'
+export type CheckResult = '正常' | '吞咽障碍' | '误吸'
 
 export interface CheckRow {
   id: string
